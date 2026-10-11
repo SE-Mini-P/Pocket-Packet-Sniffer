@@ -1,0 +1,106 @@
+/* Pocket Packet Sniffer dashboard styles.
+   Mobile-first; must not break at 360px width (SRS NFR-PORT-1). */
+
+:root {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #38bdf8;
+  --green: #22c55e;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --grey: #64748b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.app-header {
+  padding: 1.25rem 1rem;
+  border-bottom: 1px solid var(--card);
+  text-align: center;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  color: var(--accent);
+}
+
+.subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container { grid-template-columns: 1fr 1fr; }
+  .error { grid-column: 1 / -1; }
+}
+
+.card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 1rem;
+  min-width: 0;
+}
+
+.card-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.card-value {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.card-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.8rem;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  color: #0b1220;
+}
+
+.badge-idle      { background: var(--grey); }
+.badge-capturing { background: var(--green); }
+.badge-stopped   { background: var(--amber); }
+.badge-error     { background: var(--red); color: #fff; }
+.badge-unknown   { background: var(--grey); }
+
+.error {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #451a1a;
+  color: #fecaca;
+}
