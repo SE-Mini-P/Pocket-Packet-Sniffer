@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pocket Packet Sniffer</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1 id="app-title">Pocket Packet Sniffer</h1>
+    <p class="subtitle">WiFi / Ethernet / BLE Portable Dashboard</p>
+  </header>
+
+  <main class="container">
+    <section class="card" aria-labelledby="iface-label">
+      <h2 id="iface-label" class="card-label">Selected Interface</h2>
+      <p id="interface-name" class="card-value">Loading…</p>
+      <p id="interface-type" class="card-note"></p>
+    </section>
+
+    <section class="card" aria-labelledby="status-label">
+      <h2 id="status-label" class="card-label">Capture Status</h2>
+      <p class="card-value">
+        <span id="status-badge" class="badge badge-unknown">Unknown</span>
+      </p>
+      <p id="status-note" class="card-note"></p>
+    </section>
+
+    <p id="error-banner" class="error" hidden>
+      Cannot reach the backend. Is the server running?
+    </p>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
