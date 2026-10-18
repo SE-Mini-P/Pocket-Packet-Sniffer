@@ -25,6 +25,35 @@
         <span id="status-badge" class="badge badge-unknown">Unknown</span>
       </p>
       <p id="status-note" class="card-note"></p>
+      <div class="actions" aria-label="Capture controls">
+        <button id="start-button" class="button button-start" type="button">Start capture</button>
+        <button id="stop-button" class="button button-stop" type="button">Stop capture</button>
+      </div>
+    </section>
+
+    <section class="card packet-card" aria-labelledby="traffic-label">
+      <div class="section-heading">
+        <div>
+          <h2 id="traffic-label" class="card-label">Captured Traffic</h2>
+          <p class="card-note">Filter packets by protocol, source, destination, or any field.</p>
+        </div>
+        <span id="packet-count" class="count">0 packets</span>
+      </div>
+      <form id="filter-form" class="filters">
+        <label>Search <input id="search-filter" name="search" type="search" placeholder="Search packets" /></label>
+        <label>Protocol <input id="protocol-filter" name="protocol" type="text" placeholder="e.g. TCP" /></label>
+        <label>Source <input id="source-filter" name="source" type="text" placeholder="e.g. 192.168.1.10" /></label>
+        <label>Destination <input id="destination-filter" name="destination" type="text" placeholder="e.g. 443" /></label>
+        <button class="button button-filter" type="submit">Apply filters</button>
+        <button id="clear-filters" class="button button-clear" type="button">Clear</button>
+      </form>
+      <p id="capture-message" class="form-message" role="status" hidden></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Protocol</th><th>Source</th><th>Destination</th><th>Length</th><th>Info</th></tr></thead>
+          <tbody id="packet-list"><tr><td colspan="6">Loading packets…</td></tr></tbody>
+        </table>
+      </div>
     </section>
 
     <p id="error-banner" class="error" hidden>

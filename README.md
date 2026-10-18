@@ -10,7 +10,7 @@ See the SRS (PPS-SRS-1.0) for full requirements.
 ```
 Pocket-Packet-Sniffer/
 ├── backend/
-│   ├── app.py              # Flask app: serves dashboard + /api/status
+│   ├── app.py              # Flask app: serves dashboard and capture APIs
 │   ├── mock_capture.py     # Mock capture service (replace with real capture later)
 │   └── requirements.txt
 ├── frontend/
@@ -47,6 +47,10 @@ $env:PPS_MOCK_STATUS="capturing"; $env:PPS_MOCK_INTERFACE="eth0"; python backend
 
 Statuses: `idle`, `capturing`, `stopped`, `error`. Interfaces: `wlan0`, `eth0`, `ble0`.
 
+The dashboard provides Start capture and Stop capture controls. Capture actions are
+available through `POST /api/capture/start` and `POST /api/capture/stop`; invalid
+state transitions return HTTP 409 with an error message.
+
 ## API
 
 `GET /api/status`
@@ -57,3 +61,6 @@ Statuses: `idle`, `capturing`, `stopped`, `error`. Interfaces: `wlan0`, `eth0`, 
   "capture": {"status": "idle", "started_at": null}
 }
 ```
+
+`GET /api/packets` returns mock captured traffic. Optional case-insensitive query
+parameters `protocol`, `source`, `destination`, and `search` filter the results.
