@@ -10,9 +10,12 @@ Then open http://127.0.0.1:5000
 
 from pathlib import Path
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
-from mock_capture import MockCaptureService
+try:  # Works both as ``python backend/app.py`` and as an import in tests.
+    from .mock_capture import MockCaptureService
+except ImportError:
+    from mock_capture import MockCaptureService
 
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
@@ -35,6 +38,31 @@ def static_files(filename):
 def api_status():
     """Current interface + capture status (consumed by the dashboard header)."""
     return jsonify(capture.get_status())
+
+
+@app.post("/api/capture/start")
+def start_capture():
+    try:
+        return jsonify(capture.start())
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 409
+
+
+@app.post("/api/capture/stop")
+def stop_capture():
+    try:
+        return jsonify(capture.stop())
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 409
+
+
+@app.get("/api/packets")
+def api_packets():
+    filters = {
+        field: request.args.get(field, "")
+        for field in ("protocol", "source", "destination", "search")
+    }
+    return jsonify({"packets": capture.get_packets(filters), "filters": filters})
 
 
 if __name__ == "__main__":

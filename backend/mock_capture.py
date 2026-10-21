@@ -16,6 +16,7 @@ Mock behaviour can be tweaked with environment variables (handy for demos):
 
 import os
 from datetime import datetime, timezone
+from copy import deepcopy
 
 # Interfaces the real device will eventually expose (SRS FR-1, FR-2, FR-3).
 MOCK_INTERFACES = {
@@ -25,6 +26,45 @@ MOCK_INTERFACES = {
 }
 
 VALID_STATUSES = {"idle", "capturing", "stopped", "error"}
+
+MOCK_PACKETS = [
+    {
+        "id": 1,
+        "timestamp": "2025-01-15T10:15:30Z",
+        "protocol": "TCP",
+        "source": "192.168.1.10:51524",
+        "destination": "142.250.72.14:443",
+        "length": 128,
+        "info": "TLS client hello",
+    },
+    {
+        "id": 2,
+        "timestamp": "2025-01-15T10:15:31Z",
+        "protocol": "DNS",
+        "source": "192.168.1.10:5353",
+        "destination": "192.168.1.1:53",
+        "length": 74,
+        "info": "Standard query A example.com",
+    },
+    {
+        "id": 3,
+        "timestamp": "2025-01-15T10:15:32Z",
+        "protocol": "UDP",
+        "source": "192.168.1.1:67",
+        "destination": "192.168.1.10:68",
+        "length": 342,
+        "info": "DHCP offer",
+    },
+    {
+        "id": 4,
+        "timestamp": "2025-01-15T10:15:33Z",
+        "protocol": "HTTP",
+        "source": "192.168.1.10:49152",
+        "destination": "93.184.216.34:80",
+        "length": 512,
+        "info": "GET / HTTP/1.1",
+    },
+]
 
 
 class MockCaptureService:
@@ -40,6 +80,41 @@ class MockCaptureService:
             if self._status == "capturing"
             else None
         )
+        self._packets = deepcopy(MOCK_PACKETS)
+
+    def start(self) -> dict:
+        """Start capture and return the resulting status."""
+        if self._status == "capturing":
+            raise RuntimeError("Capture is already running")
+        self._status = "capturing"
+        self._started_at = datetime.now(timezone.utc).isoformat()
+        return self.get_status()
+
+    def stop(self) -> dict:
+        """Stop capture and return the resulting status."""
+        if self._status != "capturing":
+            raise RuntimeError("Capture is not running")
+        self._status = "stopped"
+        return self.get_status()
+
+    def get_packets(self, filters: dict | None = None) -> list[dict]:
+        """Return mock packets matching non-empty, case-insensitive filters."""
+        filters = filters or {}
+        packets = self._packets
+        for field in ("protocol", "source", "destination"):
+            value = filters.get(field, "").strip().lower()
+            if value:
+                packets = [
+                    packet for packet in packets
+                    if value in str(packet[field]).lower()
+                ]
+        search = filters.get("search", "").strip().lower()
+        if search:
+            packets = [
+                packet for packet in packets
+                if any(search in str(value).lower() for value in packet.values())
+            ]
+        return deepcopy(packets)
 
     def get_status(self) -> dict:
         """Return the data the dashboard needs to render its header."""
