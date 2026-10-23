@@ -8,9 +8,34 @@
 </head>
 <body>
   <header class="app-header">
-    <h1 id="app-title">Pocket Packet Sniffer</h1>
-    <p class="subtitle">WiFi / Ethernet / BLE Portable Dashboard</p>
+    <div style="display: flex; justify-content: space-between; align-items: center; max-width: 720px; margin: 0 auto;">
+      <div style="text-align: left;">
+        <h1 id="app-title">Pocket Packet Sniffer</h1>
+        <p class="subtitle">WiFi / Ethernet / BLE Portable Dashboard</p>
+      </div>
+      <div id="auth-box" style="text-align: right; font-size: 0.8rem;">
+        <span id="user-info" style="color: var(--muted); margin-right: 0.5rem;">Checking session…</span>
+        <button id="auth-btn" class="button button-clear" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" type="button">Login</button>
+      </div>
+    </div>
   </header>
+
+  <!-- Login Modal / Section (Hidden when logged in) -->
+  <div id="login-modal" class="container" style="display: none; max-width: 400px; margin-top: 1rem;">
+    <section class="card" style="grid-column: 1 / -1;">
+      <h2 class="card-label">Authenticate (SEC-REQ-2)</h2>
+      <p class="card-note" style="margin-bottom: 0.75rem;">Password must be at least 10 characters.</p>
+      <form id="login-form" style="display: grid; gap: 0.5rem;">
+        <input id="login-username" type="text" placeholder="Username (engineer or admin)" required style="padding: 0.5rem; border-radius: 6px; background: #0f172a; border: 1px solid #475569; color: var(--text);" />
+        <input id="login-password" type="password" placeholder="Password (min 10 chars)" required style="padding: 0.5rem; border-radius: 6px; background: #0f172a; border: 1px solid #475569; color: var(--text);" />
+        <button class="button button-start" type="submit" style="margin-top: 0.5rem;">Sign In</button>
+      </form>
+      <p id="login-error" class="form-message" style="display: none;"></p>
+      <div style="font-size: 0.7rem; color: var(--muted); margin-top: 0.5rem;">
+        Demo: <code>engineer</code> / <code>EngineerPass123!</code> | <code>admin</code> / <code>AdminPass123!</code>
+      </div>
+    </section>
+  </div>
 
   <main class="container">
     <section class="card" aria-labelledby="iface-label">
@@ -29,13 +54,14 @@
         <button id="start-button" class="button button-start" type="button">Start capture</button>
         <button id="stop-button" class="button button-stop" type="button">Stop capture</button>
       </div>
+      <p id="capture-error" class="form-message" style="display: none;"></p>
     </section>
 
     <section class="card packet-card" aria-labelledby="traffic-label">
       <div class="section-heading">
         <div>
           <h2 id="traffic-label" class="card-label">Captured Traffic</h2>
-          <p class="card-note">Filter packets by protocol, source, destination, or any field.</p>
+          <p class="card-note">Filter packets by protocol, source, destination, or search.</p>
         </div>
         <span id="packet-count" class="count">0 packets</span>
       </div>
@@ -47,7 +73,7 @@
         <button class="button button-filter" type="submit">Apply filters</button>
         <button id="clear-filters" class="button button-clear" type="button">Clear</button>
       </form>
-      <p id="capture-message" class="form-message" role="status" hidden></p>
+      <p id="filter-error" class="form-message" style="display: none;"></p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Time</th><th>Protocol</th><th>Source</th><th>Destination</th><th>Length</th><th>Info</th></tr></thead>
