@@ -113,6 +113,7 @@ All protected endpoints require session authentication (`Authorization: Bearer <
 | `POST` | `/api/auth/logout` | Invalidate current session token | Authenticated |
 | `GET` | `/api/auth/me` | Retrieve current user profile and role | Authenticated |
 | `GET` | `/api/interfaces` | List available capture interfaces and capabilities | Field Engineer+ |
+| `POST` | `/api/interfaces/select` | Select active capture interface prior to starting capture | Field Engineer+ |
 | `GET` | `/api/status` | Current interface and capture state | Field Engineer+ |
 | `POST` | `/api/capture/start` | Start capture with interface selection and BPF filter | Field Engineer+ |
 | `POST` | `/api/capture/stop` | Stop active capture session | Field Engineer+ |
@@ -131,8 +132,8 @@ Run the full automated test suite covering unit, integration, and security test 
 python -m unittest discover -s tests -v
 ```
 
-All 38 test cases pass:
-- `tests/test_app.py`: API endpoints, BPF validation, token sessions, account lockout, RBAC boundary enforcement.
+All 46 test cases pass:
+- `tests/test_app.py`: API endpoints, BPF validation, token sessions, account lockout, RBAC boundary enforcement, interface selection, and live traffic statistics.
 - `tests/test_processing.py`: Protocol parsing (Ethernet, IPv4, IPv6, TCP, UDP, DNS, HTTP, ARP, 802.11, BLE), metadata extraction, and malformed frame resiliency (SADS 3.4).
 - `tests/test_capture.py`: Ring buffer drop tracking (NFR-REL-1), FIFO ordering, batch popping, and interface management.
 - `tests/test_storage.py`: Tamper-evident hash-chained audit logging (SEC-REQ-5) and `.pcap` export format.
@@ -144,6 +145,10 @@ All 38 test cases pass:
 | Issue ID | Title | Story Points | Assignee | Requirements Addressed | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **#1** | Set up project structure and environment | 2 SP | `@shreyasgowda1956` | NFR-02, NFR-06, SADS 2.1, SADS 2.2 | **Completed** |
+| **#4** | Detect and select network interfaces | 3 SP | `@krrish676767` | FR-02, NFR-02, SADS 3.2 | **Completed** |
+| **#5** | Start and stop packet capture | 3 SP | `@oneshot-death` | FR-7, SADS 3.2 | Completed |
 | **#6** | Process packets and extract metadata | 5 SP | `@shreyasgowda1956` | FR-04, FR-5, FR-6, SADS 3.4 | **Completed** |
+| **#7** | Display packet list and traffic statistics | 5 SP | `@krrish676767` | FR-05, FR-6 | **Completed** |
 | **#8** | Add input validation and capture error handling | 5 SP | `@YASH0212-shift` | FR-11, SADS 3.4 | Completed |
+| **#10** | Filter and search captured traffic | 3 SP | `@oneshot-death` | FR-10, SADS 3.2 | Completed |
 | **#14** | Add authentication and access controls | 5 SP | `@YASH0212-shift` | SEC-REQ-2, SEC-REQ-3, SEC-REQ-6 | Completed |

@@ -39,9 +39,14 @@
 
   <main class="container">
     <section class="card" aria-labelledby="iface-label">
-      <h2 id="iface-label" class="card-label">Selected Interface</h2>
-      <p id="interface-name" class="card-value">Loading…</p>
+      <h2 id="iface-label" class="card-label">Network Interface (FR-02)</h2>
+      <select id="interface-select" class="interface-select" aria-label="Select Network Interface">
+        <option value="wlan0">Loading interfaces…</option>
+      </select>
+      <p id="interface-name" class="card-value" style="display: none;">Loading…</p>
       <p id="interface-type" class="card-note"></p>
+      <p id="interface-details" class="card-note" style="color: var(--accent); font-size: 0.8rem;"></p>
+      <p id="interface-error" class="form-message" style="display: none;"></p>
     </section>
 
     <section class="card" aria-labelledby="status-label">
@@ -57,11 +62,46 @@
       <p id="capture-error" class="form-message" style="display: none;"></p>
     </section>
 
-    <section class="card" aria-labelledby="stats-summary-label" style="grid-column: 1 / -1;">
-      <h2 id="stats-summary-label" class="card-label">Traffic Statistics & Protocol Distribution (FR-6)</h2>
-      <p id="stats-volume" class="card-value" style="font-size: 1.1rem; margin-bottom: 0.25rem;">0 packets | 0 B</p>
-      <div id="protocol-distribution" style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.35rem;">
-        <span class="card-note">Aggregating protocol distribution…</span>
+    <!-- Traffic Statistics Section (Issue #7, FR-05, FR-6) -->
+    <section class="card stats-card" aria-labelledby="stats-label">
+      <div class="section-heading">
+        <div>
+          <h2 id="stats-label" class="card-label">Traffic Statistics (FR-6)</h2>
+          <p class="card-note">Real-time metrics, protocol breakdown, and top active hosts</p>
+        </div>
+        <span id="stats-status" class="count">Active</span>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div id="stat-total-packets" class="stat-box-num">0</div>
+          <div class="stat-box-label">Total Packets</div>
+        </div>
+        <div class="stat-box">
+          <div id="stat-total-bytes" class="stat-box-num">0 B</div>
+          <div class="stat-box-label">Total Volume</div>
+        </div>
+        <div class="stat-box">
+          <div id="stat-rate" class="stat-box-num">0.0</div>
+          <div class="stat-box-label">Packets / Sec</div>
+        </div>
+        <div class="stat-box">
+          <div id="stat-duration" class="stat-box-num">0s</div>
+          <div class="stat-box-label">Duration</div>
+        </div>
+      </div>
+      <div class="stats-breakdown">
+        <div class="sub-panel">
+          <h3>Protocol Distribution</h3>
+          <div id="protocol-distribution">
+            <span class="card-note">No traffic yet</span>
+          </div>
+        </div>
+        <div class="sub-panel">
+          <h3>Top Talkers</h3>
+          <div id="top-talkers-list">
+            <span class="card-note">No traffic yet</span>
+          </div>
+        </div>
       </div>
     </section>
 

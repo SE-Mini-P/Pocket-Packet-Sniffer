@@ -1,5 +1,8 @@
 import unittest
+from copy import deepcopy
 from backend.app import app, capture, auth_service
+from backend.mock_capture import MOCK_INTERFACES, RAW_MOCK_PACKETS
+from processing.metadata import PacketMetadata
 
 
 class CaptureApiTest(unittest.TestCase):
@@ -7,6 +10,8 @@ class CaptureApiTest(unittest.TestCase):
         self.client = app.test_client()
         capture._status = "idle"
         capture._started_at = None
+        capture._interface = deepcopy(MOCK_INTERFACES["wlan0"])
+        capture._packets = [PacketMetadata.from_dict(p) for p in RAW_MOCK_PACKETS]
         # Reset auth state for isolated test runs
         auth_service._failed_attempts.clear()
         auth_service._lockout_until.clear()
@@ -224,6 +229,87 @@ class CaptureApiTest(unittest.TestCase):
         res = self.client.post("/api/packets/process", json={"hex": "not_valid_hex_string!"})
         self.assertEqual(res.status_code, 400)
         self.assertEqual(res.json["error_code"], "MALFORMED_HEX")
+
+    # --- Interface Detection & Selection Tests (Issue #4, FR-02, NFR-02) ---
+
+    def test_get_interfaces_returns_supported_list(self):
+        res = self.client.get("/api/interfaces")
+        self.assertEqual(res.status_code, 200)
+        data = res.json
+        self.assertIn("interfaces", data)
+        self.assertIn("selected", data)
+        ifaces = data["interfaces"] if isinstance(data["interfaces"], dict) else {i["name"]: i for i in data["interfaces"]}
+        self.assertIn("wlan0", ifaces)
+        self.assertIn("eth0", ifaces)
+        self.assertIn("ble0", ifaces)
+        self.assertEqual(ifaces["wlan0"]["type"], "WiFi (802.11 monitor mode)")
+        self.assertEqual(ifaces["eth0"]["type"], "Ethernet")
+        self.assertEqual(ifaces["ble0"]["type"], "Bluetooth Low Energy")
+
+    def test_select_valid_interface(self):
+        res = self.client.post("/api/interfaces/select", json={"interface": "eth0"})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json["interface"]["name"], "eth0")
+
+        # Verify interface updated in /api/status
+        status_res = self.client.get("/api/status")
+        self.assertEqual(status_res.json["interface"]["name"], "eth0")
+
+    def test_select_invalid_interface_returns_400(self):
+        res = self.client.post("/api/interfaces/select", json={"interface": "invalid_interface_xyz"})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json["error_code"], "INVALID_INTERFACE")
+
+    def test_select_interface_missing_payload_returns_400(self):
+        res = self.client.post("/api/interfaces/select", json={})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json["error_code"], "MISSING_INTERFACE")
+
+    def test_select_interface_during_active_capture_returns_409(self):
+        # Start capture
+        start_res = self.client.post("/api/capture/start")
+        self.assertEqual(start_res.status_code, 200)
+
+        # Attempt to change interface while capturing
+        select_res = self.client.post("/api/interfaces/select", json={"interface": "eth0"})
+        self.assertEqual(select_res.status_code, 409)
+        self.assertEqual(select_res.json["error_code"], "CONFLICT")
+        self.assertIn("Cannot change interface while capture is running", select_res.json["error"])
+
+    # --- Traffic Statistics Tests (Issue #7, FR-05, FR-6) ---
+
+    def test_get_capture_stats_returns_metrics(self):
+        res = self.client.get("/api/capture/stats")
+        self.assertEqual(res.status_code, 200)
+        stats = res.json
+        self.assertIn("total_packets", stats)
+        self.assertIn("total_bytes", stats)
+        self.assertIn("packets_per_second", stats)
+        self.assertIn("protocol_distribution", stats)
+        self.assertIn("top_talkers", stats)
+        self.assertEqual(stats["total_packets"], 4)
+        self.assertGreater(stats["total_bytes"], 0)
+
+    def test_stats_protocol_distribution_accurate(self):
+        res = self.client.get("/api/capture/stats")
+        self.assertEqual(res.status_code, 200)
+        proto_dist = res.json["protocol_distribution"]
+        self.assertEqual(proto_dist.get("TCP"), 1)
+        self.assertEqual(proto_dist.get("DNS"), 1)
+        self.assertEqual(proto_dist.get("UDP"), 1)
+        self.assertEqual(proto_dist.get("HTTP"), 1)
+
+    def test_stats_top_talkers_aggregated(self):
+        res = self.client.get("/api/capture/stats")
+        self.assertEqual(res.status_code, 200)
+        top_talkers = res.json["top_talkers"]
+        self.assertIsInstance(top_talkers, list)
+        self.assertGreater(len(top_talkers), 0)
+        # 192.168.1.10 appears in all 4 mock packets
+        ip_addresses = [t["ip"] for t in top_talkers]
+        self.assertIn("192.168.1.10", ip_addresses)
+        talker_10 = next(t for t in top_talkers if t["ip"] == "192.168.1.10")
+        self.assertEqual(talker_10["packets"], 4)
 
 
 if __name__ == "__main__":
