@@ -4,14 +4,16 @@ Serves the static single-page dashboard and JSON API.
 Runs entirely locally (offline-first, SRS 2.5). Capture is modularized.
 Implements:
 - SADS 2.2 & Issue #1: Modular architecture across capture, processing, backend, storage.
+- FR-02, NFR-02 & Issue #4: Interface detection and selection (GET /api/interfaces, POST /api/interfaces/select).
 - FR-04 & Issue #6: Packet metadata extraction, protocol dissection, and error handling.
-- FR-6 & SADS 3.2: Live statistics snapshot (GET /api/capture/stats) & interface listing.
+- FR-05, FR-6 & Issue #7: Live statistics snapshot (GET /api/capture/stats) & traffic metrics.
 - SADS 3.4 & FR-11: Centralized error handling and strict input validation.
 - SEC-REQ-2 & SEC-REQ-6: Authentication with token session & 5-attempt lockout.
 - SEC-REQ-3: Role-based access control (Field Engineer vs Admin).
 """
 
 from pathlib import Path
+from copy import deepcopy
 from flask import Flask, jsonify, request, send_from_directory, abort
 
 try:
@@ -126,15 +128,38 @@ def api_admin_system():
     }), 200
 
 
-# --- Interfaces & Status (SADS 3.2, FR-1, FR-2, FR-3) ---
+# --- Status, Interface & Capture Controls (Issues #4, #7, #8) ---
 
 @app.get("/api/interfaces")
 def api_interfaces():
-    """List available capture interfaces (WiFi/Ethernet/BLE) per SADS 3.2."""
+    """List available capture interfaces (WiFi/Ethernet/BLE) (FR-1, FR-2, FR-3, SADS 3.2)."""
     return jsonify({
-        "interfaces": get_available_interfaces(),
-        "selected": capture.get_status()["interface"]["name"],
+        "interfaces": capture.get_interfaces(),
+        "selected": capture._interface.get("name", "wlan0"),
     }), 200
+
+
+@app.post("/api/interfaces/select")
+def api_select_interface():
+    """Select active capture interface prior to starting capture (FR-02, NFR-02)."""
+    data = request.get_json(silent=True) or {}
+    iface = data.get("interface", "").strip()
+    if not iface:
+        return jsonify({
+            "error": "Field 'interface' is required",
+            "error_code": "MISSING_INTERFACE"
+        }), 400
+
+    try:
+        updated = capture.select_interface(iface)
+        return jsonify({
+            "message": f"Selected interface '{iface}'",
+            "interface": updated
+        }), 200
+    except ValueError as exc:
+        return jsonify({"error": str(exc), "error_code": "INVALID_INTERFACE"}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc), "error_code": "CONFLICT"}), 409
 
 
 @app.route("/api/status")
@@ -157,7 +182,7 @@ def start_capture():
                 "error": f"Invalid interface '{selected_iface}'. Supported: {', '.join(MOCK_INTERFACES.keys())}",
                 "error_code": "INVALID_INTERFACE"
             }), 400
-        capture._interface = MOCK_INTERFACES[selected_iface]
+        capture._interface = deepcopy(MOCK_INTERFACES[selected_iface])
 
     filter_expr = data.get("filter")
     if filter_expr:

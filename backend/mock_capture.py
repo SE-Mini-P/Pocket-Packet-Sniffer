@@ -27,8 +27,33 @@ except ImportError:
     from capture.interfaces import STANDARD_INTERFACES
     from capture.buffer import CaptureBuffer
 
-# Backwards compatible alias for interface definitions
-MOCK_INTERFACES = {k: v.to_dict() for k, v in STANDARD_INTERFACES.items()}
+# Interfaces the real device will eventually expose (SRS FR-1, FR-2, FR-3).
+MOCK_INTERFACES = {
+    "wlan0": {
+        "id": "wlan0",
+        "name": "wlan0",
+        "type": "WiFi (802.11 monitor mode)",
+        "status": "available",
+        "channel": 6,
+        "details": "2.4/5 GHz Promiscuous",
+    },
+    "eth0": {
+        "id": "eth0",
+        "name": "eth0",
+        "type": "Ethernet",
+        "status": "available",
+        "speed": "100 Mbps",
+        "details": "Wired tap",
+    },
+    "ble0": {
+        "id": "ble0",
+        "name": "ble0",
+        "type": "Bluetooth Low Energy",
+        "status": "available",
+        "rssi_threshold": -70,
+        "details": "HCI BLE scanner",
+    },
+}
 
 VALID_STATUSES = {"idle", "capturing", "stopped", "error"}
 
@@ -89,7 +114,7 @@ RAW_MOCK_PACKETS = [
 class MockCaptureService:
     def __init__(self) -> None:
         iface_key = os.getenv("PPS_MOCK_INTERFACE", "wlan0")
-        self._interface = MOCK_INTERFACES.get(iface_key, MOCK_INTERFACES["wlan0"])
+        self._interface = deepcopy(MOCK_INTERFACES.get(iface_key, MOCK_INTERFACES["wlan0"]))
 
         status = os.getenv("PPS_MOCK_STATUS", "idle").lower()
         self._status = status if status in VALID_STATUSES else "idle"
@@ -105,6 +130,27 @@ class MockCaptureService:
         ]
         for p in self._packets:
             self.ring_buffer.push(p.to_dict())
+
+    def get_interfaces(self) -> dict[str, dict]:
+        """Detect and return supported network interfaces (FR-02, NFR-02, SADS 3.2)."""
+        current_name = self._interface.get("name")
+        interfaces = {}
+        for iface_id, iface_data in MOCK_INTERFACES.items():
+            item = deepcopy(iface_data)
+            item["selected"] = (iface_id == current_name or item.get("name") == current_name)
+            interfaces[iface_id] = item
+        return interfaces
+
+    def select_interface(self, iface_name: str) -> dict:
+        """Select an available capture interface prior to capture (FR-02, NFR-02)."""
+        if self._status == "capturing":
+            raise RuntimeError("Cannot change interface while capture is running")
+        if iface_name not in MOCK_INTERFACES:
+            raise ValueError(
+                f"Invalid interface '{iface_name}'. Supported: {', '.join(MOCK_INTERFACES.keys())}"
+            )
+        self._interface = deepcopy(MOCK_INTERFACES[iface_name])
+        return dict(self._interface)
 
     def start(self) -> dict:
         """Start capture and return resulting status."""
@@ -148,9 +194,62 @@ class MockCaptureService:
             ]
         return deepcopy(packets)
 
+    def get_stats(self) -> dict:
+        """Calculate and return capture traffic statistics (FR-05, FR-6, SADS 3.2)."""
+        packets_dicts = [p.to_dict() if hasattr(p, "to_dict") else p for p in self._packets]
+        total_packets = len(packets_dicts)
+        total_bytes = sum(p.get("length", 0) for p in packets_dicts)
+
+        # Protocol distribution
+        protocol_counts: dict[str, int] = {}
+        for p in packets_dicts:
+            proto = str(p.get("protocol", "UNKNOWN")).upper()
+            protocol_counts[proto] = protocol_counts.get(proto, 0) + 1
+
+        # Top talkers (grouping IPs from source/destination host:port)
+        talker_counts: dict[str, dict] = {}
+        for p in packets_dicts:
+            for endpoint_key in ("source", "destination"):
+                raw_addr = str(p.get(endpoint_key, ""))
+                ip = raw_addr.split(":")[0] if ":" in raw_addr else raw_addr
+                if not ip:
+                    continue
+                if ip not in talker_counts:
+                    talker_counts[ip] = {"ip": ip, "packets": 0, "bytes": 0}
+                talker_counts[ip]["packets"] += 1
+                talker_counts[ip]["bytes"] += p.get("length", 0)
+
+        top_talkers = sorted(
+            talker_counts.values(),
+            key=lambda x: (x["packets"], x["bytes"]),
+            reverse=True,
+        )
+
+        duration_sec = 0.0
+        rate = 0.0
+        if self._started_at and self._status == "capturing":
+            try:
+                started_dt = datetime.fromisoformat(self._started_at.replace("Z", "+00:00"))
+                duration_sec = max(1.0, (datetime.now(timezone.utc) - started_dt).total_seconds())
+                rate = round(total_packets / duration_sec, 2)
+            except Exception:
+                duration_sec = 1.0
+                rate = float(total_packets)
+
+        return {
+            "total_packets": total_packets,
+            "total_bytes": total_bytes,
+            "packets_per_second": rate,
+            "protocol_distribution": protocol_counts,
+            "top_talkers": top_talkers[:5],
+            "capture_duration_seconds": round(duration_sec, 1),
+            "interface": dict(self._interface),
+            "status": self._status,
+        }
+
     def get_statistics(self) -> dict:
         """Compute live traffic stats and protocol distribution (FR-6, SADS 3.2)."""
-        return MetadataExtractor.extract_statistics(self._packets)
+        return self.get_stats()
 
     def get_status(self) -> dict:
         """Return status payload required by the dashboard header."""
