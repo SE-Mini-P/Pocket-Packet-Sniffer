@@ -1,4 +1,4 @@
-// Pocket Packet Sniffer dashboard logic with Auth & Error Handling.
+// Pocket Packet Sniffer dashboard logic with Auth, Traffic Stats & Error Handling.
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -100,6 +100,26 @@ async function refresh() {
   }
 }
 
+async function refreshStats() {
+  try {
+    const res = await fetch("/api/capture/stats");
+    if (!res.ok) return;
+    const stats = await res.json();
+    el("stats-volume").textContent = `${stats.total_packets} packets | ${stats.total_bytes} bytes`;
+    const dist = stats.protocol_distribution || {};
+    const entries = Object.entries(dist);
+    if (entries.length > 0) {
+      el("protocol-distribution").innerHTML = entries
+        .map(([proto, count]) => `<span class="badge" style="background:#1e293b;border:1px solid #334155;color:#38bdf8;padding:0.25rem 0.5rem;border-radius:4px;font-size:0.75rem;">${proto}: <strong>${count}</strong></span>`)
+        .join(" ");
+    } else {
+      el("protocol-distribution").innerHTML = '<span class="card-note">No traffic processed yet</span>';
+    }
+  } catch (e) {
+    // Graceful fallback
+  }
+}
+
 function filters() {
   const params = new URLSearchParams();
   ["search", "protocol", "source", "destination"].forEach((field) => {
@@ -142,6 +162,7 @@ async function changeCapture(action) {
     if (!res.ok) throw new Error(data.error || "Capture request failed");
     render(data);
     message.style.display = "none";
+    refreshStats();
   } catch (err) {
     message.textContent = err.message;
     message.style.display = "block";
@@ -153,15 +174,21 @@ el("stop-button").addEventListener("click", () => changeCapture("stop"));
 el("filter-form").addEventListener("submit", (event) => {
   event.preventDefault();
   refreshPackets();
+  refreshStats();
 });
 el("clear-filters").addEventListener("click", () => {
   el("filter-form").reset();
   el("filter-error").style.display = "none";
   refreshPackets();
+  refreshStats();
 });
 
 // Initial boot
 checkAuth();
 refresh();
 refreshPackets();
-setInterval(refresh, POLL_INTERVAL_MS);
+refreshStats();
+setInterval(() => {
+  refresh();
+  refreshStats();
+}, POLL_INTERVAL_MS);

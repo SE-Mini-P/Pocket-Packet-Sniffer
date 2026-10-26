@@ -1,11 +1,14 @@
 """Flask backend for the Pocket Packet Sniffer (PPS) dashboard.
 
 Serves the static single-page dashboard and JSON API.
-Runs entirely locally (offline-first, SRS 2.5). Capture is mocked for now.
+Runs entirely locally (offline-first, SRS 2.5). Capture is modularized.
 Implements:
-- SADS 3.4 & FR-11: Centralized error handling and strict input validation
-- SEC-REQ-2 & SEC-REQ-6: Authentication with token session & 5-attempt lockout
-- SEC-REQ-3: Role-based access control (Field Engineer vs Admin)
+- SADS 2.2 & Issue #1: Modular architecture across capture, processing, backend, storage.
+- FR-04 & Issue #6: Packet metadata extraction, protocol dissection, and error handling.
+- FR-6 & SADS 3.2: Live statistics snapshot (GET /api/capture/stats) & interface listing.
+- SADS 3.4 & FR-11: Centralized error handling and strict input validation.
+- SEC-REQ-2 & SEC-REQ-6: Authentication with token session & 5-attempt lockout.
+- SEC-REQ-3: Role-based access control (Field Engineer vs Admin).
 """
 
 from pathlib import Path
@@ -18,12 +21,23 @@ except ImportError:
     from mock_capture import MockCaptureService, MOCK_INTERFACES
     from auth import AuthService
 
+# Import processing and storage modules (Issue #1, Issue #6)
+import sys
 BASE_DIR = Path(__file__).resolve().parent
-FRONTEND_DIR = BASE_DIR.parent / "frontend"
+ROOT_DIR = BASE_DIR.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from processing.parser import PacketParser
+from processing.metadata import MetadataExtractor, PacketMetadata
+from capture.interfaces import get_available_interfaces
+
+FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = Flask(__name__, static_folder=None)
 capture = MockCaptureService()
 auth_service = AuthService()
+packet_parser = PacketParser()
 
 # Disallowed characters for safe BPF filter tokens to prevent injection
 DISALLOWED_FILTER_CHARS = set(";&|`$><!\\")
@@ -68,7 +82,6 @@ def api_login():
             "token": result["token"],
             "user": result["user"],
         })
-        # Optionally set cookie for browser-friendly session
         resp.set_cookie("session_token", result["token"], httponly=True, samesite="Lax")
         return resp, 200
     except PermissionError as e:
@@ -113,7 +126,16 @@ def api_admin_system():
     }), 200
 
 
-# --- Status & Capture Controls with Input Validation (Issue #8) ---
+# --- Interfaces & Status (SADS 3.2, FR-1, FR-2, FR-3) ---
+
+@app.get("/api/interfaces")
+def api_interfaces():
+    """List available capture interfaces (WiFi/Ethernet/BLE) per SADS 3.2."""
+    return jsonify({
+        "interfaces": get_available_interfaces(),
+        "selected": capture.get_status()["interface"]["name"],
+    }), 200
+
 
 @app.route("/api/status")
 def api_status():
@@ -121,12 +143,13 @@ def api_status():
     return jsonify(capture.get_status())
 
 
+# --- Capture Controls with Input Validation (Issue #8, FR-4, FR-7) ---
+
 @app.post("/api/capture/start")
 def start_capture():
     """Start capture with input validation on interface and filters (FR-4, FR-7, SADS 3.2.1)."""
     data = request.get_json(silent=True) or {}
 
-    # Validate interface if provided
     selected_iface = data.get("interface")
     if selected_iface:
         if selected_iface not in MOCK_INTERFACES:
@@ -136,7 +159,6 @@ def start_capture():
             }), 400
         capture._interface = MOCK_INTERFACES[selected_iface]
 
-    # Validate filter expression if provided
     filter_expr = data.get("filter")
     if filter_expr:
         if len(filter_expr) > 256:
@@ -165,9 +187,18 @@ def stop_capture():
         return jsonify({"error": str(exc), "error_code": "CONFLICT"}), 409
 
 
+# --- Packet Processing & Metadata Extraction (Issue #6, FR-04, FR-6) ---
+
+@app.get("/api/capture/stats")
+def api_capture_stats():
+    """Retrieve current session statistics snapshot (FR-6, SADS 3.2)."""
+    stats = capture.get_statistics()
+    return jsonify(stats), 200
+
+
 @app.get("/api/packets")
 def api_packets():
-    """Return filtered traffic with input validation."""
+    """Return filtered traffic with extracted metadata."""
     filters = {}
     for field in ("protocol", "source", "destination", "search"):
         val = request.args.get(field, "")
@@ -178,10 +209,62 @@ def api_packets():
             }), 400
         filters[field] = val
 
+    packets = capture.get_packets(filters)
     return jsonify({
-        "packets": capture.get_packets(filters),
-        "filters": filters
-    })
+        "packets": packets,
+        "filters": filters,
+        "count": len(packets),
+    }), 200
+
+
+@app.post("/api/packets/process")
+def api_process_packet():
+    """Process a raw packet (hex string) or packet dictionary and extract metadata (Issue #6, FR-04).
+
+    Request Body:
+        {"hex": "...", "link_type": "ethernet|wifi|ble", "interface": "eth0"}
+        or
+        {"packet": {"protocol": "TCP", "source": "...", ...}}
+    """
+    data = request.get_json(silent=True) or {}
+
+    if "hex" in data:
+        hex_data = data.get("hex", "").strip()
+        link_type = data.get("link_type", "ethernet")
+        iface = data.get("interface", capture._interface["name"])
+        try:
+            raw_bytes = bytes.fromhex(hex_data)
+        except ValueError:
+            return jsonify({
+                "error": "Invalid hex payload format",
+                "error_code": "MALFORMED_HEX"
+            }), 400
+
+        metadata = packet_parser.parse_raw(raw_bytes, link_type=link_type, interface=iface)
+        capture.add_packet(metadata)
+        return jsonify({
+            "status": "processed",
+            "metadata": metadata.to_dict()
+        }), 201
+
+    elif "packet" in data:
+        raw_dict = data.get("packet")
+        if not isinstance(raw_dict, dict):
+            return jsonify({
+                "error": "Packet must be a valid JSON dictionary",
+                "error_code": "INVALID_PACKET_FORMAT"
+            }), 400
+        metadata = MetadataExtractor.normalize(raw_dict)
+        capture.add_packet(metadata)
+        return jsonify({
+            "status": "processed",
+            "metadata": metadata.to_dict()
+        }), 201
+
+    return jsonify({
+        "error": "Request body must contain 'hex' string or 'packet' object",
+        "error_code": "MISSING_PAYLOAD"
+    }), 400
 
 
 # --- Centralized Structured Error Handlers (SADS 3.4 & Issue #8) ---

@@ -1,33 +1,38 @@
 """Mock capture service for the Pocket Packet Sniffer (PPS).
 
-No hardware (Raspberry Pi / ESP32) is available during development, so this
-module stands in for the real capture layer. It exposes the same kind of
-information the real backend will later provide: which interface is selected
-and what the capture status is.
-
-When real capture code is written, replace the internals of ``MockCaptureService``
-but keep the shape of ``get_status()`` so the dashboard does not need to change.
-
-Mock behaviour can be tweaked with environment variables (handy for demos):
-    PPS_MOCK_INTERFACE   e.g. "wlan0", "eth0", "ble0"       (default: wlan0)
-    PPS_MOCK_STATUS      "idle" | "capturing" | "stopped" | "error"
-                         (default: idle)
+Decouples edge capture from development/simulation environments.
+Integrates with:
+- processing.metadata (PacketMetadata, MetadataExtractor) - Issue #6 & FR-04
+- capture.interfaces (CaptureInterface, STANDARD_INTERFACES) - Issue #1 & FR-1/2/3
+- capture.buffer (CaptureBuffer) - NFR-REL-1
 """
 
 import os
 from datetime import datetime, timezone
 from copy import deepcopy
+from typing import Optional, Dict, Any, List
 
-# Interfaces the real device will eventually expose (SRS FR-1, FR-2, FR-3).
-MOCK_INTERFACES = {
-    "wlan0": {"name": "wlan0", "type": "WiFi (802.11 monitor mode)"},
-    "eth0": {"name": "eth0", "type": "Ethernet"},
-    "ble0": {"name": "ble0", "type": "Bluetooth Low Energy"},
-}
+try:
+    from processing.metadata import PacketMetadata, MetadataExtractor
+    from capture.interfaces import STANDARD_INTERFACES
+    from capture.buffer import CaptureBuffer
+except ImportError:
+    # Support direct backend module execution
+    import sys
+    from pathlib import Path
+    root = str(Path(__file__).resolve().parent.parent)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from processing.metadata import PacketMetadata, MetadataExtractor
+    from capture.interfaces import STANDARD_INTERFACES
+    from capture.buffer import CaptureBuffer
+
+# Backwards compatible alias for interface definitions
+MOCK_INTERFACES = {k: v.to_dict() for k, v in STANDARD_INTERFACES.items()}
 
 VALID_STATUSES = {"idle", "capturing", "stopped", "error"}
 
-MOCK_PACKETS = [
+RAW_MOCK_PACKETS = [
     {
         "id": 1,
         "timestamp": "2025-01-15T10:15:30Z",
@@ -36,6 +41,10 @@ MOCK_PACKETS = [
         "destination": "142.250.72.14:443",
         "length": 128,
         "info": "TLS client hello",
+        "flags": {"SYN": True, "ACK": False},
+        "src_port": 51524,
+        "dst_port": 443,
+        "ip_version": 4,
     },
     {
         "id": 2,
@@ -45,6 +54,9 @@ MOCK_PACKETS = [
         "destination": "192.168.1.1:53",
         "length": 74,
         "info": "Standard query A example.com",
+        "src_port": 5353,
+        "dst_port": 53,
+        "ip_version": 4,
     },
     {
         "id": 3,
@@ -54,6 +66,9 @@ MOCK_PACKETS = [
         "destination": "192.168.1.10:68",
         "length": 342,
         "info": "DHCP offer",
+        "src_port": 67,
+        "dst_port": 68,
+        "ip_version": 4,
     },
     {
         "id": 4,
@@ -63,6 +78,10 @@ MOCK_PACKETS = [
         "destination": "93.184.216.34:80",
         "length": 512,
         "info": "GET / HTTP/1.1",
+        "flags": {"ACK": True, "PSH": True},
+        "src_port": 49152,
+        "dst_port": 80,
+        "ip_version": 4,
     },
 ]
 
@@ -80,10 +99,15 @@ class MockCaptureService:
             if self._status == "capturing"
             else None
         )
-        self._packets = deepcopy(MOCK_PACKETS)
+        self.ring_buffer = CaptureBuffer(maxsize=1000)
+        self._packets: List[PacketMetadata] = [
+            PacketMetadata.from_dict(p) for p in RAW_MOCK_PACKETS
+        ]
+        for p in self._packets:
+            self.ring_buffer.push(p.to_dict())
 
     def start(self) -> dict:
-        """Start capture and return the resulting status."""
+        """Start capture and return resulting status."""
         if self._status == "capturing":
             raise RuntimeError("Capture is already running")
         self._status = "capturing"
@@ -91,33 +115,45 @@ class MockCaptureService:
         return self.get_status()
 
     def stop(self) -> dict:
-        """Stop capture and return the resulting status."""
+        """Stop capture and return resulting status."""
         if self._status != "capturing":
             raise RuntimeError("Capture is not running")
         self._status = "stopped"
         return self.get_status()
 
+    def add_packet(self, packet: PacketMetadata | dict) -> None:
+        """Add a processed packet to the active session stream."""
+        normalized = MetadataExtractor.normalize(packet)
+        self._packets.append(normalized)
+        self.ring_buffer.push(normalized.to_dict())
+
     def get_packets(self, filters: dict | None = None) -> list[dict]:
-        """Return mock packets matching non-empty, case-insensitive filters."""
+        """Return packets matching filters with extracted metadata."""
         filters = filters or {}
-        packets = self._packets
+        packets = [p.to_dict() for p in self._packets]
+
         for field in ("protocol", "source", "destination"):
             value = filters.get(field, "").strip().lower()
             if value:
                 packets = [
-                    packet for packet in packets
-                    if value in str(packet[field]).lower()
+                    pkt for pkt in packets
+                    if value in str(pkt.get(field, "")).lower()
                 ]
+
         search = filters.get("search", "").strip().lower()
         if search:
             packets = [
-                packet for packet in packets
-                if any(search in str(value).lower() for value in packet.values())
+                pkt for pkt in packets
+                if any(search in str(v).lower() for v in pkt.values())
             ]
         return deepcopy(packets)
 
+    def get_statistics(self) -> dict:
+        """Compute live traffic stats and protocol distribution (FR-6, SADS 3.2)."""
+        return MetadataExtractor.extract_statistics(self._packets)
+
     def get_status(self) -> dict:
-        """Return the data the dashboard needs to render its header."""
+        """Return status payload required by the dashboard header."""
         return {
             "interface": dict(self._interface),
             "capture": {
