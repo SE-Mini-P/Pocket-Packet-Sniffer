@@ -80,6 +80,7 @@ async function loadInterfaces() {
   try {
     const res = await fetch("/api/interfaces");
     if (!res.ok) throw new Error("Failed to load interfaces");
+    const data = await res.json();
     const raw = data.interfaces || {};
     availableInterfaces = Array.isArray(raw) ? raw : Object.values(raw);
 
