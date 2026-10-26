@@ -167,6 +167,64 @@ class CaptureApiTest(unittest.TestCase):
         self.assertEqual(res_admin.status_code, 200)
         self.assertEqual(res_admin.json["status"], "ok")
 
+    # --- Processing & Interfaces API Tests (Issue #1, Issue #6) ---
+
+    def test_get_capture_statistics(self):
+        res = self.client.get("/api/capture/stats")
+        self.assertEqual(res.status_code, 200)
+        data = res.json
+        self.assertIn("total_packets", data)
+        self.assertIn("total_bytes", data)
+        self.assertIn("protocol_distribution", data)
+        self.assertIn("top_talkers", data)
+        self.assertGreater(data["total_packets"], 0)
+
+    def test_get_interfaces_endpoint(self):
+        res = self.client.get("/api/interfaces")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("interfaces", res.json)
+        self.assertIn("wlan0", res.json["interfaces"])
+        self.assertIn("eth0", res.json["interfaces"])
+        self.assertIn("ble0", res.json["interfaces"])
+
+    def test_process_packet_with_dictionary(self):
+        payload = {
+            "packet": {
+                "id": 99,
+                "protocol": "ICMP",
+                "source": "10.0.0.1",
+                "destination": "10.0.0.2",
+                "length": 64,
+                "info": "Echo request (ping)",
+            }
+        }
+        res = self.client.post("/api/packets/process", json=payload)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.json["status"], "processed")
+        meta = res.json["metadata"]
+        self.assertEqual(meta["protocol"], "ICMP")
+        self.assertEqual(meta["source"], "10.0.0.1")
+
+    def test_process_packet_with_raw_hex(self):
+        # 14 bytes ethernet + 20 bytes IP + 20 bytes TCP (SYN)
+        hex_data = (
+            "00112233445566778899aabb0800"  # Eth
+            "450000281234400040060000c0a8016408080808"  # IPv4
+            "d4310050000003e8000000005002ffff00000000"  # TCP
+        )
+        res = self.client.post("/api/packets/process", json={"hex": hex_data, "link_type": "ethernet"})
+        self.assertEqual(res.status_code, 201)
+        meta = res.json["metadata"]
+        self.assertEqual(meta["protocol"], "TCP")
+        self.assertEqual(meta["source"], "192.168.1.100:54321")
+        self.assertEqual(meta["destination"], "8.8.8.8:80")
+        self.assertFalse(meta["is_malformed"])
+
+    def test_process_packet_with_malformed_hex_returns_400(self):
+        res = self.client.post("/api/packets/process", json={"hex": "not_valid_hex_string!"})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json["error_code"], "MALFORMED_HEX")
+
 
 if __name__ == "__main__":
     unittest.main()
