@@ -1,12 +1,19 @@
 # Pocket Packet Sniffer (PPS)
 
-Portable WiFi / Ethernet / BLE packet sniffer with real-time analysis and a local web dashboard.
-Designed for network diagnostics, wireless site surveys, and lightweight edge anomaly detection.
+[![Pocket Packet Sniffer CI](https://github.com/SE-Mini-P/Pocket-Packet-Sniffer/actions/workflows/ci.yml/badge.svg)](https://github.com/SE-Mini-P/Pocket-Packet-Sniffer/actions)
+![Tests](https://img.shields.io/badge/Tests-46%20passed-brightgreen)
+![Coverage](https://img.shields.io/badge/Coverage-91%25-brightgreen)
+![Status](https://img.shields.io/badge/Sprint%202-Frozen%20%28v1.0--RC1%29-blue)
+
+Portable WiFi / Ethernet / BLE packet sniffer with real-time protocol analysis and a self-hosted web dashboard.
+Designed for network field diagnostics, wireless site surveys, and lightweight edge anomaly detection.
 
 Refer to the companion specifications in `docs/`:
 - **Software Requirements Specification** (`docs/SRS_Pocket_Packet_Sniffer.pdf` / PPS-SRS-1.0)
 - **Software Architecture & Design Specification** (`docs/SADS_Pocket_Packet_Sniffer.pdf` / PPS-SADS-1.0)
 - **Software Test Plan** (`docs/TestPlan_Pocket_Packet_Sniffer.pdf` / PPS-TP-1.0)
+- **Automated Test Results & Verification** ([`docs/TEST_RESULTS.md`](docs/TEST_RESULTS.md))
+- **Sprint 2 Development Freeze Specification** ([`docs/SPRINT2_FREEZE.md`](docs/SPRINT2_FREEZE.md))
 
 ---
 
@@ -40,13 +47,18 @@ Pocket-Packet-Sniffer/
 │   ├── index.html            # Responsive single-page dashboard
 │   ├── css/styles.css        # Responsive styling (NFR-PORT-1 >= 360px viewport)
 │   └── js/app.js             # Live polling, stats refresh, filter application, auth handling
-├── tests/                    # Automated Test Suite - SADS 3.5, NFR-MAINT-1
+├── tests/                    # Automated Test Suite - SADS 3.5, NFR-MAINT-1 (46/46 passing)
 │   ├── __init__.py
 │   ├── test_app.py           # REST API, auth lockout, RBAC, and input validation tests
 │   ├── test_processing.py    # Protocol dissection, metadata extraction, and malformed frame tests
 │   ├── test_capture.py       # Ring buffer overflow bounds, interface detection tests
 │   └── test_storage.py       # SQLite persistence, pcap exporter, and audit log integrity tests
-├── docs/                     # Engineering design specifications (SRS, SADS, Test Plan)
+├── docs/                     # Specifications, test evidence, demo videos & freeze reports
+│   ├── demos/                # Sprint demonstration videos
+│   ├── SPRINT2_FREEZE.md     # Release baseline and development freeze declaration
+│   └── TEST_RESULTS.md       # Comprehensive 46-test execution and 91% coverage report
+├── .github/workflows/        # CI/CD Workflows
+│   └── ci.yml                # Automated GitHub Actions test & coverage gate (>= 70%)
 ├── requirements.txt          # Root Python dependency manifest
 ├── .gitignore                # Git exclusions
 └── README.md                 # Setup, usage, and architectural documentation
@@ -87,6 +99,14 @@ python backend/app.py
 
 Open your browser and navigate to **`http://127.0.0.1:5000`**.
 
+### Default Authentication Credentials (SEC-REQ-2 / SEC-REQ-3)
+| Username | Password | Role | Access Scope |
+| :--- | :--- | :--- | :--- |
+| `engineer` | `EngineerPass123!` | `field_engineer` | Capture controls, filtering, stats, traffic export |
+| `admin` | `AdminPass123!` | `admin` | Full system access, configuration, admin controls |
+
+*Note: Security policy enforces minimum 10-character passwords and locks accounts for 5 minutes after 5 consecutive failed login attempts (SEC-REQ-6).*
+
 ### Environment Options (Testing & Demos)
 You can customize mock interfaces and states via environment variables:
 
@@ -124,31 +144,43 @@ All protected endpoints require session authentication (`Authorization: Bearer <
 
 ---
 
-## 5. Running Automated Tests
+## 5. Running Automated Tests & Code Coverage
 
 Run the full automated test suite covering unit, integration, and security test cases:
 
 ```bash
+# Run all 46 tests
 python -m unittest discover -s tests -v
+
+# Run with Coverage verification (enforces >= 70% threshold)
+python -m coverage run -m unittest discover -s tests
+python -m coverage report --fail-under=70
 ```
 
-All 46 test cases pass:
-- `tests/test_app.py`: API endpoints, BPF validation, token sessions, account lockout, RBAC boundary enforcement, interface selection, and live traffic statistics.
-- `tests/test_processing.py`: Protocol parsing (Ethernet, IPv4, IPv6, TCP, UDP, DNS, HTTP, ARP, 802.11, BLE), metadata extraction, and malformed frame resiliency (SADS 3.4).
-- `tests/test_capture.py`: Ring buffer drop tracking (NFR-REL-1), FIFO ordering, batch popping, and interface management.
-- `tests/test_storage.py`: Tamper-evident hash-chained audit logging (SEC-REQ-5) and `.pcap` export format.
+### Coverage Summary (91% Achieved)
+- **Statements:** 1,232
+- **Passing Tests:** 46 / 46
+- **Pass Rate:** 100%
+- See detailed report in [`docs/TEST_RESULTS.md`](docs/TEST_RESULTS.md).
 
 ---
 
-## 6. Sprint 1 Traceability Matrix
+## 6. Sprint Backlog & Traceability Matrix
 
+### Sprint 1: Core Capture & Dashboard MVP (36 Story Points — 100% Complete)
 | Issue ID | Title | Story Points | Assignee | Requirements Addressed | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **#1** | Set up project structure and environment | 2 SP | `@shreyasgowda1956` | NFR-02, NFR-06, SADS 2.1, SADS 2.2 | **Completed** |
-| **#4** | Detect and select network interfaces | 3 SP | `@krrish676767` | FR-02, NFR-02, SADS 3.2 | **Completed** |
-| **#5** | Start and stop packet capture | 3 SP | `@oneshot-death` | FR-7, SADS 3.2 | Completed |
-| **#6** | Process packets and extract metadata | 5 SP | `@shreyasgowda1956` | FR-04, FR-5, FR-6, SADS 3.4 | **Completed** |
-| **#7** | Display packet list and traffic statistics | 5 SP | `@krrish676767` | FR-05, FR-6 | **Completed** |
-| **#8** | Add input validation and capture error handling | 5 SP | `@YASH0212-shift` | FR-11, SADS 3.4 | Completed |
-| **#10** | Filter and search captured traffic | 3 SP | `@oneshot-death` | FR-10, SADS 3.2 | Completed |
-| **#14** | Add authentication and access controls | 5 SP | `@YASH0212-shift` | SEC-REQ-2, SEC-REQ-3, SEC-REQ-6 | Completed |
+| **#1** | Set up project structure and environment | 2 SP | `@shreyasgowda1956` | NFR-02, NFR-06, SADS 2.1, SADS 2.2 | **Closed (PR #20)** |
+| **#2** | Build dashboard layout and capture status | 3 SP | `@oneshot-death` | FR-01, NFR-03 | **Closed (PR #3)** |
+| **#4** | Detect and select network interfaces | 3 SP | `@krrish676767` | FR-02, NFR-02, SADS 3.2 | **Closed (PR #21)** |
+| **#5** | Start and stop packet capture | 5 SP | `@oneshot-death` | FR-03, FR-7, SADS 3.2 | **Closed (PR #17)** |
+| **#6** | Process packets and extract metadata | 5 SP | `@shreyasgowda1956` | FR-04, FR-5, FR-6, SADS 3.4 | **Closed (PR #20)** |
+| **#7** | Display packet list and traffic statistics | 5 SP | `@krrish676767` | FR-05, FR-6 | **Closed (PR #21)** |
+| **#8** | Add input validation and capture error handling | 3 SP | `@YASH0212-shift` | FR-11, SADS 3.4 | **Closed (PR #19)** |
+| **#10** | Filter and search captured traffic | 5 SP | `@oneshot-death` | FR-06, SADS 3.2 | **Closed (PR #17)** |
+| **#14** | Add authentication and access controls | 5 SP | `@YASH0212-shift` | SEC-REQ-2, SEC-REQ-3, SEC-REQ-6 | **Closed (PR #19)** |
+
+### Sprint 2: Automated Checks & Development Freeze
+| Issue ID | Title | Story Points | Assignee | Requirements Addressed | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **#16** | Complete automated checks and documentation | 5 SP | `@YASH0212-shift` | NFR-MAINT-1, NFR-06 | **Closed (PR #24)** |
