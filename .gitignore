@@ -13,3 +13,7 @@ venv/
 *.pcap
 *.pcapng
 .pytest_cache/
+
+.coverage
+htmlcov/
+.pytest_cache/

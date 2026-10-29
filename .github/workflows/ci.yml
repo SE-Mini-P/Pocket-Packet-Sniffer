@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Run Unit Tests
+    name: Run Unit Tests & Coverage Gate
     runs-on: ubuntu-latest
 
     steps:
@@ -23,14 +23,16 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
-          pip install flake8
+          pip install flake8 coverage
 
       - name: Lint with Flake8
         run: |
           # Stop the build if there are Python syntax errors or undefined names
-          flake8 backend tests --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 backend capture processing storage tests --count --select=E9,F63,F7,F82 --show-source --statistics
 
-      - name: Run Backend Unittests
+      - name: Run Backend Unittests with Coverage Gate (>= 70%)
         run: |
-          python -m unittest discover tests
+          python -m coverage run -m unittest discover -s tests
+          python -m coverage report --fail-under=70
