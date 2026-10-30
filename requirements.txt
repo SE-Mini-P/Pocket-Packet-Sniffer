@@ -1,0 +1,6 @@
+# Pocket Packet Sniffer - Python Dependencies
+# Satisfies SRS 2.4, 3.3 and Issue #1
+Flask>=2.2.0
+scapy>=2.5.0
+pyshark>=0.6.0
+pytest>=7.0.0
