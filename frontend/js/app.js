@@ -59,6 +59,27 @@ function renderPackets(packets) {
     : '<tr><td colspan="6">No packets match the current filters.</td></tr>';
 }
 
+function renderSessions(sessions) {
+  el("history-empty").hidden = sessions.length > 0;
+  el("history-table-wrap").hidden = sessions.length === 0;
+  el("session-list").innerHTML = sessions.map((session) => {
+    const protocols = Object.entries(session.analysis.protocol_counts)
+      .map(([protocol, count]) => `${protocol}: ${count}`).join(", ") || "Pending";
+    return `<tr><td>${session.id}</td><td>${new Date(session.started_at).toLocaleString()}</td><td>${session.ended_at ? new Date(session.ended_at).toLocaleString() : "In progress"}</td><td>${session.packet_count}</td><td>${protocols} (${session.analysis.total_bytes} B)</td></tr>`;
+  }).join("");
+}
+
+async function refreshSessions() {
+  try {
+    const res = await fetch("/api/sessions");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    renderSessions((await res.json()).sessions);
+    el("history-error").hidden = true;
+  } catch (err) {
+    el("history-error").hidden = false;
+  }
+}
+
 async function refreshPackets() {
   try {
     const res = await fetch("/api/packets?" + filters());
@@ -84,7 +105,10 @@ async function changeCapture(action) {
 }
 
 el("start-button").addEventListener("click", () => changeCapture("start"));
-el("stop-button").addEventListener("click", () => changeCapture("stop"));
+el("stop-button").addEventListener("click", async () => {
+  await changeCapture("stop");
+  refreshSessions();
+});
 el("filter-form").addEventListener("submit", (event) => {
   event.preventDefault();
   refreshPackets();
@@ -94,3 +118,4 @@ el("clear-filters").addEventListener("click", () => {
   refreshPackets();
 });
 refreshPackets();
+refreshSessions();

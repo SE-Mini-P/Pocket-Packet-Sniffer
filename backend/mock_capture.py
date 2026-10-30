@@ -81,6 +81,9 @@ class MockCaptureService:
             else None
         )
         self._packets = deepcopy(MOCK_PACKETS)
+        self._sessions = []
+        self._active_session_id = None
+        self._next_session_id = 1
 
     def start(self) -> dict:
         """Start capture and return the resulting status."""
@@ -88,6 +91,17 @@ class MockCaptureService:
             raise RuntimeError("Capture is already running")
         self._status = "capturing"
         self._started_at = datetime.now(timezone.utc).isoformat()
+        self._active_session_id = f"session-{self._next_session_id}"
+        self._next_session_id += 1
+        self._sessions.append({
+            "id": self._active_session_id,
+            "interface": dict(self._interface),
+            "started_at": self._started_at,
+            "ended_at": None,
+            "status": "capturing",
+            "packet_count": 0,
+            "analysis": {"protocol_counts": {}, "total_bytes": 0},
+        })
         return self.get_status()
 
     def stop(self) -> dict:
@@ -95,7 +109,42 @@ class MockCaptureService:
         if self._status != "capturing":
             raise RuntimeError("Capture is not running")
         self._status = "stopped"
+        session = self._get_active_session()
+        session.update({
+            "ended_at": datetime.now(timezone.utc).isoformat(),
+            "status": "completed",
+            "packet_count": len(self._packets),
+            "analysis": self._analyse_packets(self._packets),
+        })
+        self._active_session_id = None
         return self.get_status()
+
+    def get_sessions(self) -> list[dict]:
+        """Return completed and in-progress capture sessions, newest first."""
+        return deepcopy(list(reversed(self._sessions)))
+
+    def get_session(self, session_id: str) -> dict | None:
+        """Return one capture session, or ``None`` if it does not exist."""
+        for session in self._sessions:
+            if session["id"] == session_id:
+                return deepcopy(session)
+        return None
+
+    def _get_active_session(self) -> dict:
+        for session in self._sessions:
+            if session["id"] == self._active_session_id:
+                return session
+        raise RuntimeError("Capture session is not available")
+
+    @staticmethod
+    def _analyse_packets(packets: list[dict]) -> dict:
+        protocol_counts = {}
+        total_bytes = 0
+        for packet in packets:
+            protocol = packet["protocol"]
+            protocol_counts[protocol] = protocol_counts.get(protocol, 0) + 1
+            total_bytes += packet["length"]
+        return {"protocol_counts": protocol_counts, "total_bytes": total_bytes}
 
     def get_packets(self, filters: dict | None = None) -> list[dict]:
         """Return mock packets matching non-empty, case-insensitive filters."""

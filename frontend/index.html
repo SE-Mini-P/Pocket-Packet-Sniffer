@@ -56,6 +56,23 @@
       </div>
     </section>
 
+    <section class="card history-card" aria-labelledby="history-label">
+      <div class="section-heading">
+        <div>
+          <h2 id="history-label" class="card-label">Capture History</h2>
+          <p class="card-note">Completed sessions and their available analysis results.</p>
+        </div>
+      </div>
+      <p id="history-empty" class="card-note">No capture sessions yet.</p>
+      <div class="table-wrap" id="history-table-wrap" hidden>
+        <table>
+          <thead><tr><th>Session</th><th>Started</th><th>Ended</th><th>Packets</th><th>Analysis</th></tr></thead>
+          <tbody id="session-list"></tbody>
+        </table>
+      </div>
+      <p id="history-error" class="form-message" role="status" hidden>Unable to load capture history.</p>
+    </section>
+
     <p id="error-banner" class="error" hidden>
       Cannot reach the backend. Is the server running?
     </p>

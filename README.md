@@ -64,3 +64,8 @@ state transitions return HTTP 409 with an error message.
 
 `GET /api/packets` returns mock captured traffic. Optional case-insensitive query
 parameters `protocol`, `source`, `destination`, and `search` filter the results.
+
+`GET /api/sessions` returns capture history. Each session includes its interface,
+start/end timestamps, packet count, and analysis results (packet counts by
+protocol and total bytes). `GET /api/sessions/<session-id>` returns one session;
+unknown session IDs return HTTP 404.
