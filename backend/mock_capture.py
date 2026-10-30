@@ -8,9 +8,17 @@ Integrates with:
 """
 
 import os
+import sys
+import time
+import shutil
 from datetime import datetime, timezone
 from copy import deepcopy
 from typing import Optional, Dict, Any, List
+
+try:
+    import resource
+except ImportError:
+    resource = None
 
 try:
     from processing.metadata import PacketMetadata, MetadataExtractor
@@ -110,6 +118,45 @@ RAW_MOCK_PACKETS = [
     },
 ]
 
+RAW_MOCK_ALERTS = [
+    {
+        "id": 1,
+        "timestamp": "2025-01-15T10:15:28Z",
+        "alert_type": "PORT_SCAN_DETECTED",
+        "severity": "CRITICAL",
+        "source_ip": "192.168.1.105",
+        "destination_ip": "192.168.1.10",
+        "details": "Heuristic triggered: 18 distinct ports probed within 8.2 seconds (FR-08, PPS-F-014)",
+    },
+    {
+        "id": 2,
+        "timestamp": "2025-01-15T10:15:30Z",
+        "alert_type": "SYN_FLOOD_ANOMALY",
+        "severity": "CRITICAL",
+        "source_ip": "192.168.1.200",
+        "destination_ip": "192.168.1.10",
+        "details": "Half-open TCP connection threshold exceeded: 62 SYN pkts/10s (FR-08, PPS-F-015)",
+    },
+    {
+        "id": 3,
+        "timestamp": "2025-01-15T10:15:31Z",
+        "alert_type": "SUSPICIOUS_DNS_QUERY",
+        "severity": "WARNING",
+        "source_ip": "192.168.1.10",
+        "destination_ip": "192.168.1.1",
+        "details": "High-entropy domain name resolution: a8f9c12b7.evil-c2.internal (FR-08, SADS 3.3)",
+    },
+    {
+        "id": 4,
+        "timestamp": "2025-01-15T10:15:32Z",
+        "alert_type": "PARSING_ANOMALY",
+        "severity": "INFO",
+        "source_ip": "192.168.1.55",
+        "destination_ip": "192.168.1.10",
+        "details": "Truncated frame detected and recovered: expected >= 20 bytes IPv4 header (SADS 3.4)",
+    },
+]
+
 
 class MockCaptureService:
     def __init__(self) -> None:
@@ -130,6 +177,8 @@ class MockCaptureService:
         ]
         for p in self._packets:
             self.ring_buffer.push(p.to_dict())
+        self._alerts: List[Dict[str, Any]] = [deepcopy(a) for a in RAW_MOCK_ALERTS]
+        self._latency_samples: List[float] = [12.4, 18.2, 14.8, 22.1, 15.6]
 
     def get_interfaces(self) -> dict[str, dict]:
         """Detect and return supported network interfaces (FR-02, NFR-02, SADS 3.2)."""
@@ -259,4 +308,109 @@ class MockCaptureService:
                 "status": self._status,
                 "started_at": self._started_at,
             },
+        }
+
+    def get_alerts(self, severity: Optional[str] = None, search: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Return analysis observations and security alerts (FR-08, SADS 3.3)."""
+        alerts = [deepcopy(a) for a in self._alerts]
+        if severity:
+            sev = severity.strip().upper()
+            alerts = [a for a in alerts if a.get("severity", "").upper() == sev]
+        if search:
+            q = search.strip().lower()
+            alerts = [
+                a for a in alerts
+                if any(q in str(val).lower() for val in a.values())
+            ]
+        return alerts
+
+    def add_alert(self, alert_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Record a new security alert or traffic observation (FR-08)."""
+        new_id = len(self._alerts) + 1
+        record = {
+            "id": new_id,
+            "timestamp": alert_data.get("timestamp") or datetime.now(timezone.utc).isoformat(),
+            "alert_type": alert_data.get("alert_type", "CUSTOM_OBSERVATION"),
+            "severity": (alert_data.get("severity") or "INFO").upper(),
+            "source_ip": alert_data.get("source_ip", "0.0.0.0"),
+            "destination_ip": alert_data.get("destination_ip", "0.0.0.0"),
+            "details": alert_data.get("details", ""),
+        }
+        self._alerts.insert(0, record)
+        return record
+
+    def record_latency(self, latency_ms: float) -> None:
+        """Track API response latency sample for performance telemetry (NFR-02)."""
+        self._latency_samples.append(latency_ms)
+        if len(self._latency_samples) > 200:
+            self._latency_samples.pop(0)
+
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Measure dashboard response times and observe CPU, memory, storage usage (NFR-01, NFR-07)."""
+        # Latency statistics (NFR-02)
+        samples = self._latency_samples if self._latency_samples else [15.0]
+        sorted_samples = sorted(samples)
+        mean_lat = round(sum(samples) / len(samples), 2)
+        p95_idx = int(len(sorted_samples) * 0.95)
+        p95_lat = round(sorted_samples[min(p95_idx, len(sorted_samples) - 1)], 2)
+        min_lat = round(sorted_samples[0], 2)
+        max_lat = round(sorted_samples[-1], 2)
+
+        # CPU & Memory RSS observation (NFR-01, NFR-07, PPS-NF-003)
+        cpu_time_sec = 0.0
+        user_cpu_sec = 0.0
+        sys_cpu_sec = 0.0
+        rss_mb = 45.0
+        if resource:
+            rusage = resource.getrusage(resource.RUSAGE_SELF)
+            user_cpu_sec = round(rusage.ru_utime, 3)
+            sys_cpu_sec = round(rusage.ru_stime, 3)
+            cpu_time_sec = round(user_cpu_sec + sys_cpu_sec, 3)
+            # macOS returns bytes; Linux returns KB
+            max_rss_bytes = rusage.ru_maxrss if sys.platform == "darwin" else rusage.ru_maxrss * 1024
+            rss_mb = round(max_rss_bytes / (1024 * 1024), 2)
+
+        # Storage & Buffer observation (NFR-07, PPS-F-010)
+        buffer_len = len(self.ring_buffer._buffer)
+        buffer_cap = self.ring_buffer.maxsize
+        buffer_util_pct = round((buffer_len / max(1, buffer_cap)) * 100, 1)
+        total_bytes = sum(p.get("length", 0) for p in self.get_packets())
+
+        disk_free_gb = 10.0
+        try:
+            usage = shutil.disk_usage(os.getcwd())
+            disk_free_gb = round(usage.free / (1024 ** 3), 2)
+        except Exception:
+            pass
+
+        return {
+            "dashboard_response_time_ms": {
+                "mean": mean_lat,
+                "p95": p95_lat,
+                "min": min_lat,
+                "max": max_lat,
+                "target_threshold_ms": 500.0,
+                "status": "PASS" if p95_lat <= 500.0 else "FAIL",
+            },
+            "cpu_usage": {
+                "process_cpu_time_sec": cpu_time_sec,
+                "user_cpu_sec": user_cpu_sec,
+                "system_cpu_sec": sys_cpu_sec,
+                "utilization_estimate_pct": round(min(100.0, cpu_time_sec * 5), 1),
+                "status": "NORMAL",
+            },
+            "memory_usage": {
+                "rss_mb": rss_mb,
+                "bounded_ceiling_mb": 512.0,
+                "status": "BOUNDED" if rss_mb < 512.0 else "WARNING",
+            },
+            "storage_usage": {
+                "ring_buffer_packets": buffer_len,
+                "ring_buffer_capacity": buffer_cap,
+                "ring_buffer_utilization_pct": buffer_util_pct,
+                "total_captured_bytes": total_bytes,
+                "disk_free_gb": disk_free_gb,
+                "status": "NOMINAL",
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }

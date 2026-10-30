@@ -50,6 +50,18 @@ class DatabaseManager:
                 )
             """)
 
+            # Alerts table for security anomalies and observations (FR-08, SADS 3.3)
+            self._conn.execute("""
+                CREATE TABLE IF NOT EXISTS alerts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    alert_type TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    source_ip TEXT,
+                    details TEXT,
+                    timestamp TEXT NOT NULL
+                )
+            """)
+
     def record_audit_event(self, actor: str, action: str, details: Optional[str] = None) -> Dict[str, Any]:
         """Append a tamper-evident event to the hash-chained audit log (SEC-REQ-5)."""
         with self._conn:
@@ -103,6 +115,40 @@ class DatabaseManager:
 
     def get_audit_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
         cursor = self._conn.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (limit,))
+        return [dict(row) for row in cursor.fetchall()]
+
+    def record_alert(self, alert_type: str, severity: str, source_ip: Optional[str] = None, details: Optional[str] = None) -> Dict[str, Any]:
+        """Record an analysis alert or observation into the database (FR-08, SADS 3.3)."""
+        with self._conn:
+            ts = datetime.now(timezone.utc).isoformat()
+            cursor = self._conn.execute(
+                """
+                INSERT INTO alerts (alert_type, severity, source_ip, details, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (alert_type, severity.upper(), source_ip or "unknown", details or "", ts),
+            )
+            return {
+                "id": cursor.lastrowid,
+                "alert_type": alert_type,
+                "severity": severity.upper(),
+                "source_ip": source_ip or "unknown",
+                "details": details or "",
+                "timestamp": ts,
+            }
+
+    def get_alerts(self, severity: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """Retrieve stored alerts with optional severity filtering (FR-08)."""
+        if severity:
+            cursor = self._conn.execute(
+                "SELECT * FROM alerts WHERE UPPER(severity) = ? ORDER BY id DESC LIMIT ?",
+                (severity.upper(), limit),
+            )
+        else:
+            cursor = self._conn.execute(
+                "SELECT * FROM alerts ORDER BY id DESC LIMIT ?",
+                (limit,),
+            )
         return [dict(row) for row in cursor.fetchall()]
 
     def close(self) -> None:

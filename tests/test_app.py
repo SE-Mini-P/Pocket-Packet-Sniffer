@@ -311,6 +311,113 @@ class CaptureApiTest(unittest.TestCase):
         talker_10 = next(t for t in top_talkers if t["ip"] == "192.168.1.10")
         self.assertEqual(talker_10["packets"], 4)
 
+    # --- Alerts & Security Observation Tests (Issue #11, FR-08, SADS 3.3) ---
+
+    def test_get_alerts_endpoint(self):
+        res = self.client.get("/api/alerts")
+        self.assertEqual(res.status_code, 200)
+        data = res.json
+        self.assertIn("alerts", data)
+        self.assertIn("count", data)
+        self.assertGreaterEqual(data["count"], 4)
+        first = data["alerts"][0]
+        self.assertIn("alert_type", first)
+        self.assertIn("severity", first)
+        self.assertIn("timestamp", first)
+
+    def test_get_alerts_filtered_by_severity(self):
+        res = self.client.get("/api/alerts?severity=CRITICAL")
+        self.assertEqual(res.status_code, 200)
+        alerts = res.json["alerts"]
+        self.assertGreater(len(alerts), 0)
+        for a in alerts:
+            self.assertEqual(a["severity"], "CRITICAL")
+
+        res_warn = self.client.get("/api/alerts?severity=warning")
+        self.assertEqual(res_warn.status_code, 200)
+        for a in res_warn.json["alerts"]:
+            self.assertEqual(a["severity"], "WARNING")
+
+    def test_get_alerts_search_filter(self):
+        res = self.client.get("/api/alerts?search=heuristic")
+        self.assertEqual(res.status_code, 200)
+        alerts = res.json["alerts"]
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]["alert_type"], "PORT_SCAN_DETECTED")
+
+    def test_get_alerts_oversized_filter_returns_400(self):
+        res = self.client.get("/api/alerts?severity=" + ("A" * 100))
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json["error_code"], "FILTER_TOO_LONG")
+
+    def test_post_alert_success(self):
+        payload = {
+            "alert_type": "SYN_FLOOD_ANOMALY",
+            "severity": "CRITICAL",
+            "source_ip": "10.0.0.99",
+            "details": "SYN burst rate exceeded 50 handshakes/10s",
+        }
+        res = self.client.post("/api/alerts", json=payload)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.json["status"], "created")
+        created = res.json["alert"]
+        self.assertEqual(created["alert_type"], "SYN_FLOOD_ANOMALY")
+        self.assertEqual(created["severity"], "CRITICAL")
+        self.assertEqual(created["source_ip"], "10.0.0.99")
+
+    def test_post_alert_validation_errors(self):
+        # Empty payload
+        res = self.client.post("/api/alerts", json=None)
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json["error_code"], "MISSING_PAYLOAD")
+
+        # Missing alert_type
+        res = self.client.post("/api/alerts", json={"severity": "INFO"})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json["error_code"], "MISSING_ALERT_TYPE")
+
+        # Invalid severity
+        res = self.client.post("/api/alerts", json={"alert_type": "TEST", "severity": "EXTREME"})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json["error_code"], "INVALID_SEVERITY")
+
+        # Field too long
+        res = self.client.post("/api/alerts", json={"alert_type": "A" * 70})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json["error_code"], "FIELD_TOO_LONG")
+
+        res_ip = self.client.post("/api/alerts", json={"alert_type": "TEST", "source_ip": "9" * 50})
+        self.assertEqual(res_ip.status_code, 400)
+        self.assertEqual(res_ip.json["error_code"], "FIELD_TOO_LONG")
+
+        res_details = self.client.post("/api/alerts", json={"alert_type": "TEST", "details": "D" * 600})
+        self.assertEqual(res_details.status_code, 400)
+        self.assertEqual(res_details.json["error_code"], "FIELD_TOO_LONG")
+
+    # --- Performance & Telemetry Tests (Issue #15, NFR-01, NFR-07) ---
+
+    def test_system_performance_endpoint(self):
+        res = self.client.get("/api/system/performance")
+        self.assertEqual(res.status_code, 200)
+        data = res.json
+        self.assertIn("dashboard_response_time_ms", data)
+        self.assertIn("cpu_usage", data)
+        self.assertIn("memory_usage", data)
+        self.assertIn("storage_usage", data)
+
+        lat = data["dashboard_response_time_ms"]
+        self.assertIn("mean", lat)
+        self.assertIn("p95", lat)
+        self.assertLessEqual(lat["mean"], 500.0)
+
+        mem = data["memory_usage"]
+        self.assertGreater(mem["rss_mb"], 0.0)
+        self.assertEqual(mem["status"], "BOUNDED")
+
+        storage = data["storage_usage"]
+        self.assertGreater(storage["ring_buffer_capacity"], 0)
+        self.assertEqual(storage["status"], "NOMINAL")
+
 
 if __name__ == "__main__":
     unittest.main()

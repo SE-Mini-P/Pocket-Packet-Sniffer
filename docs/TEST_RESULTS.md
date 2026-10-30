@@ -9,18 +9,18 @@
 
 ## 1. Executive Test Summary
 
-The Pocket Packet Sniffer automated test suite executes **46 test cases** spanning unit, integration, and security verification. All tests execute in **0.17 seconds** with a **100% pass rate** and achieve **91% statement test coverage**, strictly satisfying the $\ge 70\%$ test coverage requirement specified in **NFR-MAINT-1** and **NFR-06**.
+The Pocket Packet Sniffer automated test suite executes **57 test cases** spanning unit, integration, performance, and security verification. All tests execute in **0.069 seconds** with a **100% pass rate** and achieve **92% statement test coverage**, strictly satisfying the $\ge 70\%$ test coverage requirement specified in **NFR-MAINT-1** and **NFR-06**.
 
 ```
 ======================================================================
 Test Suite Execution Summary:
-- Total Tests Executed:   46
-- Passing:                46
+- Total Tests Executed:   57
+- Passing:                57
 - Failures:                0
 - Errors:                  0
-- Total Execution Time:    0.169s
-- Total Code Statements: 1,232
-- Statement Coverage:     91% (Target: >= 70%)
+- Total Execution Time:    0.069s
+- Total Code Statements: 1,495
+- Statement Coverage:     92% (Target: >= 70%)
 - Status:                 PASSED (Quality Gate Satisfied)
 ======================================================================
 ```
@@ -33,22 +33,23 @@ Automated statement coverage generated via `Coverage.py` across all production a
 
 | Module / Package | Total Statements | Missed Statements | Statement Coverage | Status |
 | :--- | :---: | :---: | :---: | :---: |
-| `backend/app.py` | 168 | 12 | **93%** | Meets Gate |
+| `backend/app.py` | 212 | 12 | **94%** | Meets Gate |
 | `backend/auth.py` | 69 | 9 | **87%** | Meets Gate |
-| `backend/mock_capture.py` | 107 | 17 | **84%** | Meets Gate |
+| `backend/mock_capture.py` | 165 | 22 | **87%** | Meets Gate |
 | `capture/buffer.py` | 47 | 3 | **94%** | Meets Gate |
 | `capture/interfaces.py` | 19 | 0 | **100%** | Meets Gate |
 | `capture/service.py` | 48 | 4 | **92%** | Meets Gate |
 | `processing/error_handling.py` | 26 | 1 | **96%** | Meets Gate |
 | `processing/metadata.py` | 50 | 2 | **96%** | Meets Gate |
 | `processing/parser.py` | 195 | 52 | **73%** | Meets Gate |
-| `storage/database.py` | 43 | 3 | **93%** | Meets Gate |
+| `storage/database.py` | 54 | 3 | **94%** | Meets Gate |
 | `storage/pcap_store.py` | 18 | 0 | **100%** | Meets Gate |
-| `tests/test_app.py` | 207 | 1 | **99%** | Meets Gate |
+| `tests/test_app.py` | 285 | 1 | **99%** | Meets Gate |
 | `tests/test_capture.py` | 72 | 1 | **99%** | Meets Gate |
+| `tests/test_performance.py` | 58 | 1 | **98%** | Meets Gate |
 | `tests/test_processing.py` | 107 | 1 | **99%** | Meets Gate |
-| `tests/test_storage.py` | 45 | 1 | **98%** | Meets Gate |
-| **PROJECT TOTAL** | **1,232** | **107** | **91%** | **PASSED** |
+| `tests/test_storage.py` | 59 | 1 | **98%** | Meets Gate |
+| **PROJECT TOTAL** | **1,495** | **113** | **92%** | **PASSED** |
 
 ---
 
@@ -78,6 +79,13 @@ Every automated test case traces bidirectionally to requirements in `PPS-SRS-1.0
 | `test_select_interface_missing_payload_returns_400` | Validates missing JSON body handling | Negative Test | FR-11 | **PASS** |
 | `test_select_interface_during_active_capture_returns_409` | Guard preventing adapter switch while capturing | Safety Check | FR-02, FR-7 | **PASS** |
 | `test_capture_stats_endpoint` | Verifies real-time rates, volume, protocol counts, top talkers | `TC-PERF-08` | FR-05, FR-6 | **PASS** |
+| `test_get_alerts_endpoint` | Verifies alerts list, schema, count, and observation payload | `TC-SEC-04` | FR-08, SADS 3.3 | **PASS** |
+| `test_get_alerts_filtered_by_severity` | Verifies filtering by CRITICAL, WARNING, and INFO | `TC-SEC-04` | FR-08 | **PASS** |
+| `test_get_alerts_search_filter` | Verifies search query filter across alert fields | `TC-SEC-04` | FR-08 | **PASS** |
+| `test_get_alerts_oversized_filter_returns_400` | Rejects oversized filter parameters (>64/128 chars) | Negative Test | FR-11 | **PASS** |
+| `test_post_alert_success` | Ingests valid security alert / observation (201 Created) | `TC-SEC-04` | FR-08 | **PASS** |
+| `test_post_alert_validation_errors` | Rejects missing payload, bad severity, oversized fields | Negative Test | FR-11 | **PASS** |
+| `test_system_performance_endpoint` | Verifies latency, CPU, memory RSS, and storage telemetry | `TC-PERF-01` | NFR-01, NFR-07 | **PASS** |
 
 ### 3.2 Capture Layer & Ring Buffer (`tests/test_capture.py`)
 | Test Method | Description | Test Plan ID | SRS Req | Result |
@@ -115,8 +123,16 @@ Every automated test case traces bidirectionally to requirements in `PPS-SRS-1.0
 | `test_database_init_and_session` | SQLite schema creation and capture session lifecycle persistence | `TC-SEC-01` | SEC-REQ-1 | **PASS** |
 | `test_save_packets` | Persists parsed packet records with foreign key relationships | `TC-SEC-01` | FR-09 | **PASS** |
 | `test_audit_logging_hash_chain` | SHA-256 hash chaining of audit log entries for tamper evidence | `TC-SEC-02` | SEC-REQ-5 | **PASS** |
+| `test_alerts_storage_and_filtering` | SQLite persistence and filtering of security & anomaly alerts | `TC-SEC-01` | FR-08, SADS 3.3 | **PASS** |
 | `test_pcap_write_valid_header` | Writes standards-compliant 24-byte libpcap global header | `TC-FUNC-05` | FR-8 | **PASS** |
 | `test_pcap_write_packet_records` | Writes standard 16-byte packet record headers and raw payloads | `TC-FUNC-05` | FR-8 | **PASS** |
+
+### 3.5 Performance & Resource Usage Verification (`tests/test_performance.py`)
+| Test Method | Description | Test Plan ID | SRS Req | Result |
+| :--- | :--- | :--- | :--- | :---: |
+| `test_dashboard_response_times_under_threshold` | Measures latency across 6 endpoints; asserts mean & p95 $\le 500$ ms | `TC-NF-PERF-02` | NFR-02, PPS-NF-002 | **PASS** |
+| `test_memory_boundedness_under_burst_load` | Ingests 2,500 frames into 500-slot buffer; verifies no OOM or leak | `TC-NF-PERF-01` | NFR-REL-1, PPS-F-010 | **PASS** |
+| `test_resource_observation_telemetry` | Validates CPU, memory RSS, buffer %, and storage telemetry | `TC-NF-UX-01` | NFR-01, NFR-07 | **PASS** |
 
 ---
 
@@ -128,7 +144,7 @@ To execute the test suite locally with coverage analysis:
 # Activate virtual environment
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Run all 46 tests
+# Run all 57 tests
 python -m unittest discover -s tests -v
 
 # Run with Coverage verification (>= 70% threshold)
