@@ -75,6 +75,28 @@ class StorageLayerTest(unittest.TestCase):
             if os.path.exists(temp_pcap):
                 os.remove(temp_pcap)
 
+    def test_alerts_storage_and_filtering(self):
+        # Record security alerts into SQLite (FR-08, SADS 3.3)
+        a1 = self.db.record_alert("PORT_SCAN_DETECTED", "CRITICAL", "192.168.1.105", "Port sweep")
+        a2 = self.db.record_alert("SUSPICIOUS_DNS_QUERY", "WARNING", "192.168.1.10", "DGA domain")
+        a3 = self.db.record_alert("PARSING_ANOMALY", "INFO", "192.168.1.55", "Truncated frame")
+
+        self.assertIsNotNone(a1["id"])
+        self.assertEqual(a1["severity"], "CRITICAL")
+
+        # Query all alerts
+        all_alerts = self.db.get_alerts()
+        self.assertEqual(len(all_alerts), 3)
+
+        # Filter by severity
+        crit_alerts = self.db.get_alerts(severity="CRITICAL")
+        self.assertEqual(len(crit_alerts), 1)
+        self.assertEqual(crit_alerts[0]["alert_type"], "PORT_SCAN_DETECTED")
+
+        warn_alerts = self.db.get_alerts(severity="warning")
+        self.assertEqual(len(warn_alerts), 1)
+        self.assertEqual(warn_alerts[0]["alert_type"], "SUSPICIOUS_DNS_QUERY")
+
 
 if __name__ == "__main__":
     unittest.main()
