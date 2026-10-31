@@ -237,3 +237,100 @@ th { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; }
   color: var(--muted);
   font-size: 0.75rem;
 }
+
+/* Alerts & Observations Subsystem (Issue #11, FR-08) */
+.alert-card, .perf-card {
+  grid-column: 1 / -1;
+}
+
+.alert-controls {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.alert-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.alert-chip {
+  background: #0f172a;
+  color: var(--muted);
+  border: 1px solid #334155;
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.alert-chip:hover {
+  color: var(--text);
+  border-color: #475569;
+}
+
+.alert-chip.active {
+  background: #334155;
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.alert-chip-critical.active {
+  background: #7f1d1d;
+  color: #fecaca;
+  border-color: #ef4444;
+}
+
+.alert-chip-warning.active {
+  background: #78350f;
+  color: #fde68a;
+  border-color: #f59e0b;
+}
+
+.alert-chip-info.active {
+  background: #0c4a6e;
+  color: #bae6fd;
+  border-color: #38bdf8;
+}
+
+.badge-critical {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #7f1d1d;
+  color: #fecaca;
+  border: 1px solid #ef4444;
+}
+
+.badge-warning {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #78350f;
+  color: #fde68a;
+  border: 1px solid #f59e0b;
+}
+
+.badge-info {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #0c4a6e;
+  color: #bae6fd;
+  border: 1px solid #38bdf8;
+}
+
+.stat-box-status {
+  font-size: 0.7rem;
+  color: var(--green);
+  font-weight: 600;
+  margin-top: 0.2rem;
+}

@@ -1,8 +1,8 @@
 # Pocket Packet Sniffer (PPS)
 
 [![Pocket Packet Sniffer CI](https://github.com/SE-Mini-P/Pocket-Packet-Sniffer/actions/workflows/ci.yml/badge.svg)](https://github.com/SE-Mini-P/Pocket-Packet-Sniffer/actions)
-![Tests](https://img.shields.io/badge/Tests-46%20passed-brightgreen)
-![Coverage](https://img.shields.io/badge/Coverage-91%25-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-57%20passed-brightgreen)
+![Coverage](https://img.shields.io/badge/Coverage-92%25-brightgreen)
 ![Status](https://img.shields.io/badge/Sprint%202-Frozen%20%28v1.0--RC1%29-blue)
 
 Portable WiFi / Ethernet / BLE packet sniffer with real-time protocol analysis and a self-hosted web dashboard.
@@ -13,6 +13,7 @@ Refer to the companion specifications in `docs/`:
 - **Software Architecture & Design Specification** (`docs/SADS_Pocket_Packet_Sniffer.pdf` / PPS-SADS-1.0)
 - **Software Test Plan** (`docs/TestPlan_Pocket_Packet_Sniffer.pdf` / PPS-TP-1.0)
 - **Automated Test Results & Verification** ([`docs/TEST_RESULTS.md`](docs/TEST_RESULTS.md))
+- **Performance & Resource Usage Report** ([`docs/PERFORMANCE_REPORT.md`](docs/PERFORMANCE_REPORT.md))
 - **Sprint 2 Development Freeze Specification** ([`docs/SPRINT2_FREEZE.md`](docs/SPRINT2_FREEZE.md))
 
 ---
@@ -146,10 +147,10 @@ All protected endpoints require session authentication (`Authorization: Bearer <
 
 ## 5. Running Automated Tests & Code Coverage
 
-Run the full automated test suite covering unit, integration, and security test cases:
+Run the full automated test suite covering unit, integration, performance, and security test cases:
 
 ```bash
-# Run all 46 tests
+# Run all 57 tests
 python -m unittest discover -s tests -v
 
 # Run with Coverage verification (enforces >= 70% threshold)
@@ -157,11 +158,11 @@ python -m coverage run -m unittest discover -s tests
 python -m coverage report --fail-under=70
 ```
 
-### Coverage Summary (91% Achieved)
-- **Statements:** 1,232
-- **Passing Tests:** 46 / 46
+### Coverage Summary (92% Achieved)
+- **Statements:** 1,495
+- **Passing Tests:** 57 / 57
 - **Pass Rate:** 100%
-- See detailed report in [`docs/TEST_RESULTS.md`](docs/TEST_RESULTS.md).
+- See detailed reports in [`docs/TEST_RESULTS.md`](docs/TEST_RESULTS.md) and [`docs/PERFORMANCE_REPORT.md`](docs/PERFORMANCE_REPORT.md).
 
 ---
 
@@ -180,9 +181,11 @@ python -m coverage report --fail-under=70
 | **#10** | Filter and search captured traffic | 5 SP | `@oneshot-death` | FR-06, SADS 3.2 | **Closed (PR #17)** |
 | **#14** | Add authentication and access controls | 5 SP | `@YASH0212-shift` | SEC-REQ-2, SEC-REQ-3, SEC-REQ-6 | **Closed (PR #19)** |
 
-### Sprint 2: Automated Checks & Development Freeze
+### Sprint 2: Automated Checks, Alerts & Performance Verification
 | Issue ID | Title | Story Points | Assignee | Requirements Addressed | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| **#11** | Display alerts and analysis observations | 5 SP | `@krrish676767` | FR-08, SADS 3.3 | **Closed (PR #26)** |
+| **#15** | Test performance and resource usage | 5 SP | `@krrish676767` | NFR-01, NFR-02, NFR-07, SADS 3.5 | **Closed (PR #26)** |
 | **#16** | Complete automated checks and documentation | 5 SP | `@YASH0212-shift` | NFR-MAINT-1, NFR-06 | **Closed (PR #24)** |
 
 ### Capture session history (Issue #12)

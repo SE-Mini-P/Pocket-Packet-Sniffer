@@ -105,6 +105,74 @@
       </div>
     </section>
 
+    <!-- Performance & Resource Usage (Issue #15, NFR-01, NFR-07) -->
+    <section class="card perf-card" aria-labelledby="perf-label">
+      <div class="section-heading">
+        <div>
+          <h2 id="perf-label" class="card-label">Performance & System Resources (NFR-01, NFR-07)</h2>
+          <p class="card-note">Dashboard response time latency, CPU, bounded memory RSS, and storage</p>
+        </div>
+        <span id="perf-status-badge" class="badge badge-capturing" style="font-size: 0.8rem; padding: 0.15rem 0.6rem;">Healthy</span>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div id="stat-latency" class="stat-box-num">-- ms</div>
+          <div class="stat-box-label">Response Latency (Mean)</div>
+          <div class="stat-box-status" id="stat-latency-status">Target: &lt; 500ms</div>
+        </div>
+        <div class="stat-box">
+          <div id="stat-p95" class="stat-box-num">-- ms</div>
+          <div class="stat-box-label">95th Percentile</div>
+          <div class="stat-box-status">NFR-02 Compliant</div>
+        </div>
+        <div class="stat-box">
+          <div id="stat-cpu" class="stat-box-num">--</div>
+          <div class="stat-box-label">Process CPU Time</div>
+          <div class="stat-box-status">Normal Load</div>
+        </div>
+        <div class="stat-box">
+          <div id="stat-memory" class="stat-box-num">-- MB</div>
+          <div class="stat-box-label">Memory RSS</div>
+          <div class="stat-box-status">Bounded &lt; 512MB</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Security Alerts & Observations Section (Issue #11, FR-08, SADS 3.3) -->
+    <section class="card alert-card" aria-labelledby="alerts-label">
+      <div class="section-heading">
+        <div>
+          <h2 id="alerts-label" class="card-label">Alerts & Analysis Observations (FR-08)</h2>
+          <p class="card-note">Zeek security anomalies, frame parsing alerts, and traffic diagnostics</p>
+        </div>
+        <span id="alert-count" class="count">0 alerts</span>
+      </div>
+      <div class="alert-controls">
+        <div class="alert-filter-chips">
+          <button class="alert-chip active" type="button" data-severity="">All</button>
+          <button class="alert-chip alert-chip-critical" type="button" data-severity="CRITICAL">Critical</button>
+          <button class="alert-chip alert-chip-warning" type="button" data-severity="WARNING">Warning</button>
+          <button class="alert-chip alert-chip-info" type="button" data-severity="INFO">Info</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Severity</th>
+              <th>Alert Type</th>
+              <th>Source</th>
+              <th>Observation Details</th>
+            </tr>
+          </thead>
+          <tbody id="alert-list">
+            <tr><td colspan="5">Loading alerts…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="card packet-card" aria-labelledby="traffic-label">
       <div class="section-heading">
         <div>

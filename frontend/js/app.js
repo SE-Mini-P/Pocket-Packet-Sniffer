@@ -311,6 +311,93 @@ el("clear-filters").addEventListener("click", () => {
   refreshStats();
 });
 
+// --- Alerts & Analysis Observations (Issue #11, FR-08) ---
+
+let currentAlertSeverity = "";
+
+async function refreshAlerts() {
+  const alertList = el("alert-list");
+  const countEl = el("alert-count");
+  if (!alertList) return;
+
+  try {
+    const url = currentAlertSeverity
+      ? `/api/alerts?severity=${encodeURIComponent(currentAlertSeverity)}`
+      : "/api/alerts";
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    const alerts = data.alerts || [];
+
+    if (countEl) countEl.textContent = `${alerts.length} alert${alerts.length === 1 ? "" : "s"}`;
+
+    if (alerts.length === 0) {
+      alertList.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 1rem;">No security alerts detected. Traffic nominal.</td></tr>';
+      return;
+    }
+
+    alertList.innerHTML = alerts
+      .map((a) => {
+        const sev = (a.severity || "INFO").toUpperCase();
+        let badgeClass = "badge-info";
+        if (sev === "CRITICAL") badgeClass = "badge-critical";
+        else if (sev === "WARNING") badgeClass = "badge-warning";
+
+        const timeStr = a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : "--:--:--";
+        const sourceStr = a.source_ip || "unknown";
+        return `<tr>
+          <td>${timeStr}</td>
+          <td><span class="${badgeClass}">${sev}</span></td>
+          <td><strong>${a.alert_type}</strong></td>
+          <td><code>${sourceStr}</code></td>
+          <td style="white-space: normal; max-width: 280px;">${a.details || ""}</td>
+        </tr>`;
+      })
+      .join("");
+  } catch (err) {
+    // Non-blocking
+  }
+}
+
+document.querySelectorAll(".alert-chip").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".alert-chip").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentAlertSeverity = btn.getAttribute("data-severity") || "";
+    refreshAlerts();
+  });
+});
+
+// --- Performance & Resource Telemetry (Issue #15, NFR-01, NFR-07) ---
+
+async function refreshPerformance() {
+  try {
+    const res = await fetch("/api/system/performance");
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const latency = data.dashboard_response_time_ms;
+    if (latency && el("stat-latency")) {
+      el("stat-latency").textContent = `${latency.mean} ms`;
+    }
+    if (latency && el("stat-p95")) {
+      el("stat-p95").textContent = `${latency.p95} ms`;
+    }
+
+    const cpu = data.cpu_usage;
+    if (cpu && el("stat-cpu")) {
+      el("stat-cpu").textContent = `${cpu.process_cpu_time_sec}s`;
+    }
+
+    const mem = data.memory_usage;
+    if (mem && el("stat-memory")) {
+      el("stat-memory").textContent = `${mem.rss_mb} MB`;
+    }
+  } catch (err) {
+    // Non-blocking
+  }
+}
+
 // Initial boot
 checkAuth();
 loadInterfaces();
@@ -318,8 +405,13 @@ refresh();
 refreshPackets();
 refreshSessions();
 refreshStats();
+refreshAlerts();
+refreshPerformance();
+
 setInterval(() => {
   refresh();
   refreshStats();
   refreshSessions();
+  refreshAlerts();
+  refreshPerformance();
 }, POLL_INTERVAL_MS);

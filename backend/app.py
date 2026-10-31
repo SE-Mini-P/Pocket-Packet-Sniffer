@@ -12,9 +12,10 @@ Implements:
 - SEC-REQ-3: Role-based access control (Field Engineer vs Admin).
 """
 
+import time
 from pathlib import Path
 from copy import deepcopy
-from flask import Flask, jsonify, request, send_from_directory, abort
+from flask import Flask, jsonify, request, send_from_directory, abort, g
 
 try:
     from .mock_capture import MockCaptureService, MOCK_INTERFACES
@@ -43,6 +44,19 @@ packet_parser = PacketParser()
 
 # Disallowed characters for safe BPF filter tokens to prevent injection
 DISALLOWED_FILTER_CHARS = set(";&|`$><!\\")
+
+
+@app.before_request
+def record_start_time():
+    g.start_time = time.time()
+
+
+@app.after_request
+def track_response_latency(response):
+    if hasattr(g, "start_time"):
+        latency_ms = round((time.time() - g.start_time) * 1000, 2)
+        capture.record_latency(latency_ms)
+    return response
 
 
 def get_current_user():
@@ -290,6 +304,88 @@ def api_process_packet():
         "error": "Request body must contain 'hex' string or 'packet' object",
         "error_code": "MISSING_PAYLOAD"
     }), 400
+
+
+# --- Security Alerts & Observations (Issue #11, FR-08, SADS 3.3) ---
+
+@app.get("/api/alerts")
+def api_alerts():
+    """Return security alerts and analysis observations (FR-08, SADS 3.3)."""
+    severity = request.args.get("severity", "").strip()
+    search = request.args.get("search", "").strip()
+    if len(severity) > 64 or len(search) > 128:
+        return jsonify({
+            "error": "Filter parameter exceeds allowable length",
+            "error_code": "FILTER_TOO_LONG"
+        }), 400
+
+    alerts = capture.get_alerts(severity=severity if severity else None, search=search if search else None)
+    return jsonify({
+        "alerts": alerts,
+        "count": len(alerts),
+        "filter": {"severity": severity, "search": search},
+    }), 200
+
+
+@app.post("/api/alerts")
+def api_create_alert():
+    """Record an analysis alert or security observation (FR-08, SADS 3.3)."""
+    data = request.get_json(silent=True)
+    if not data or not isinstance(data, dict):
+        return jsonify({
+            "error": "Request body must be a JSON dictionary",
+            "error_code": "MISSING_PAYLOAD"
+        }), 400
+
+    alert_type = data.get("alert_type", "").strip()
+    if not alert_type:
+        return jsonify({
+            "error": "Field 'alert_type' is required",
+            "error_code": "MISSING_ALERT_TYPE"
+        }), 400
+
+    if len(alert_type) > 64:
+        return jsonify({
+            "error": "Field 'alert_type' exceeds maximum length of 64 characters",
+            "error_code": "FIELD_TOO_LONG"
+        }), 400
+
+    severity = data.get("severity", "INFO").strip().upper()
+    valid_severities = {"CRITICAL", "WARNING", "INFO"}
+    if severity not in valid_severities:
+        return jsonify({
+            "error": f"Invalid severity '{severity}'. Supported: {', '.join(sorted(valid_severities))}",
+            "error_code": "INVALID_SEVERITY"
+        }), 400
+
+    details = data.get("details", "")
+    if len(details) > 512:
+        return jsonify({
+            "error": "Field 'details' exceeds maximum length of 512 characters",
+            "error_code": "FIELD_TOO_LONG"
+        }), 400
+
+    source_ip = data.get("source_ip", "")
+    if len(source_ip) > 45:
+        return jsonify({
+            "error": "Field 'source_ip' exceeds maximum IPv4/IPv6 length of 45 characters",
+            "error_code": "FIELD_TOO_LONG"
+        }), 400
+
+    created = capture.add_alert(data)
+    return jsonify({
+        "status": "created",
+        "alert": created
+    }), 201
+
+
+# --- Performance & Resource Telemetry (Issue #15, NFR-01, NFR-07) ---
+
+@app.get("/api/system/performance")
+def api_system_performance():
+    """Return dashboard response times, CPU, memory, and storage telemetry (NFR-01, NFR-07)."""
+    metrics = capture.get_performance_metrics()
+    return jsonify(metrics), 200
 
 
 # --- Centralized Structured Error Handlers (SADS 3.4 & Issue #8) ---
