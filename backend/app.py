@@ -410,5 +410,19 @@ def handle_server_error(e):
     return jsonify({"error": "Internal server error occurred", "error_code": "INTERNAL_ERROR"}), 500
 
 
+@app.get("/api/sessions")
+def api_sessions():
+    """Return capture history, including analysis summaries for each session."""
+    return jsonify({"sessions": capture.get_sessions()})
+
+
+@app.get("/api/sessions/<session_id>")
+def api_session(session_id):
+    session = capture.get_session(session_id)
+    if session is None:
+        return jsonify({"error": "Capture session not found"}), 404
+    return jsonify({"session": session})
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

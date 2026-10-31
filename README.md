@@ -187,3 +187,10 @@ python -m coverage report --fail-under=70
 | **#11** | Display alerts and analysis observations | 5 SP | `@krrish676767` | FR-08, SADS 3.3 | **Closed (PR #26)** |
 | **#15** | Test performance and resource usage | 5 SP | `@krrish676767` | NFR-01, NFR-02, NFR-07, SADS 3.5 | **Closed (PR #26)** |
 | **#16** | Complete automated checks and documentation | 5 SP | `@YASH0212-shift` | NFR-MAINT-1, NFR-06 | **Closed (PR #24)** |
+
+### Capture session history (Issue #12)
+
+`GET /api/sessions` returns capture history. Each session includes its interface,
+start/end timestamps, packet count, and analysis results (packet counts by
+protocol and total bytes). `GET /api/sessions/<session-id>` returns one session;
+unknown session IDs return HTTP 404.

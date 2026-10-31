@@ -55,6 +55,7 @@ body {
 }
 
 .packet-card { grid-column: 1 / -1; }
+.history-card { grid-column: 1 / -1; }
 .section-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
 .count { color: var(--accent); font-size: 0.85rem; white-space: nowrap; }
 .actions, .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }

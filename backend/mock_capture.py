@@ -177,6 +177,9 @@ class MockCaptureService:
         ]
         for p in self._packets:
             self.ring_buffer.push(p.to_dict())
+        self._sessions = []
+        self._active_session_id = None
+        self._next_session_id = 1
         self._alerts: List[Dict[str, Any]] = [deepcopy(a) for a in RAW_MOCK_ALERTS]
         self._latency_samples: List[float] = [12.4, 18.2, 14.8, 22.1, 15.6]
 
@@ -207,6 +210,17 @@ class MockCaptureService:
             raise RuntimeError("Capture is already running")
         self._status = "capturing"
         self._started_at = datetime.now(timezone.utc).isoformat()
+        self._active_session_id = f"session-{self._next_session_id}"
+        self._next_session_id += 1
+        self._sessions.append({
+            "id": self._active_session_id,
+            "interface": deepcopy(self._interface),
+            "started_at": self._started_at,
+            "ended_at": None,
+            "status": "capturing",
+            "packet_count": 0,
+            "analysis": {"protocol_counts": {}, "total_bytes": 0},
+        })
         return self.get_status()
 
     def stop(self) -> dict:
@@ -214,7 +228,43 @@ class MockCaptureService:
         if self._status != "capturing":
             raise RuntimeError("Capture is not running")
         self._status = "stopped"
+        session = self._get_active_session()
+        session.update({
+            "ended_at": datetime.now(timezone.utc).isoformat(),
+            "status": "completed",
+            "packet_count": len(self._packets),
+            "analysis": self._analyse_packets(self._packets),
+        })
+        self._active_session_id = None
         return self.get_status()
+
+    def get_sessions(self) -> list[dict]:
+        """Return completed and in-progress capture sessions, newest first."""
+        return deepcopy(list(reversed(self._sessions)))
+
+    def get_session(self, session_id: str) -> dict | None:
+        """Return one capture session, or ``None`` if it does not exist."""
+        for session in self._sessions:
+            if session["id"] == session_id:
+                return deepcopy(session)
+        return None
+
+    def _get_active_session(self) -> dict:
+        for session in self._sessions:
+            if session["id"] == self._active_session_id:
+                return session
+        raise RuntimeError("Capture session is not available")
+
+    @staticmethod
+    def _analyse_packets(packets: list[dict]) -> dict:
+        protocol_counts = {}
+        total_bytes = 0
+        for item in packets:
+            packet = item.to_dict() if hasattr(item, "to_dict") else item
+            protocol = packet.get("protocol", "UNKNOWN")
+            protocol_counts[protocol] = protocol_counts.get(protocol, 0) + 1
+            total_bytes += packet.get("length", 0)
+        return {"protocol_counts": protocol_counts, "total_bytes": total_bytes}
 
     def add_packet(self, packet: PacketMetadata | dict) -> None:
         """Add a processed packet to the active session stream."""

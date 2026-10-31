@@ -12,6 +12,9 @@ class CaptureApiTest(unittest.TestCase):
         capture._started_at = None
         capture._interface = deepcopy(MOCK_INTERFACES["wlan0"])
         capture._packets = [PacketMetadata.from_dict(p) for p in RAW_MOCK_PACKETS]
+        capture._sessions = []
+        capture._active_session_id = None
+        capture._next_session_id = 1
         # Reset auth state for isolated test runs
         auth_service._failed_attempts.clear()
         auth_service._lockout_until.clear()
@@ -47,6 +50,29 @@ class CaptureApiTest(unittest.TestCase):
         response = self.client.post("/api/capture/stop")
         self.assertEqual(response.status_code, 409)
         self.assertIn("not running", response.json["error"])
+
+    def test_capture_history_contains_analysis_results(self):
+        self.client.post("/api/capture/start")
+        self.client.post("/api/capture/stop")
+
+        response = self.client.get("/api/sessions")
+        self.assertEqual(response.status_code, 200)
+        sessions = response.json["sessions"]
+        self.assertEqual(len(sessions), 1)
+        session = sessions[0]
+        self.assertEqual(session["status"], "completed")
+        self.assertEqual(session["packet_count"], 4)
+        self.assertEqual(session["analysis"]["protocol_counts"]["TCP"], 1)
+        self.assertEqual(session["analysis"]["total_bytes"], 1056)
+        self.assertIsNotNone(session["ended_at"])
+
+        detail = self.client.get(f"/api/sessions/{session['id']}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json["session"]["id"], session["id"])
+
+    def test_unknown_capture_session_returns_not_found(self):
+        response = self.client.get("/api/sessions/session-999")
+        self.assertEqual(response.status_code, 404)
 
     # --- Input Validation & Error Handling Tests (Issue #8) ---
 
