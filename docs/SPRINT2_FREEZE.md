@@ -12,8 +12,8 @@
 As of **29th October 2026**, the development cycle for the **Pocket Packet Sniffer (PPS)** is officially **FROZEN**. No new feature code or schema alterations may be merged to the `main` branch without formal Engineering Change Request approval.
 
 All codebase artifacts have passed quality gates:
-- **Unit & Integration Tests:** 46/46 passing (100% pass rate).
-- **Test Statement Coverage:** 91% (exceeds the 70% threshold in NFR-MAINT-1).
+- **Unit & Integration Tests:** 92/92 passing (100% pass rate).
+- **Test Statement Coverage:** 92% (exceeds the 70% threshold in NFR-MAINT-1).
 - **Linting & Quality:** Flake8 clean; zero syntax or unresolved name errors.
 - **CI/CD Automation:** GitHub Actions workflow executing on every push and pull request.
 
@@ -68,7 +68,7 @@ Per **Deliverables Part-2 Item 3b** (*"Record a two minute video of the outcome 
   - Show audit log hash-chaining verification in SQLite storage (`storage/database.py`).
 - **1:50 – 2:00 (Automated Test Suite & Quality Gate):**
   - Run `python -m coverage run -m unittest discover tests` in terminal.
-  - Display `Ran 46 tests - OK` and `Statement Coverage: 91%`.
+  - Display `Ran 92 tests - OK` and `Statement Coverage: 92%`.
 
 ---
 

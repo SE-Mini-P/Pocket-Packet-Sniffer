@@ -240,9 +240,20 @@ function renderSessions(sessions) {
   el("history-empty").hidden = sessions.length > 0;
   el("history-table-wrap").hidden = sessions.length === 0;
   el("session-list").innerHTML = sessions.map((session) => {
-    const protocols = Object.entries(session.analysis.protocol_counts)
+    const protocols = Object.entries(session.analysis.protocol_counts || {})
       .map(([protocol, count]) => `${protocol}: ${count}`).join(", ") || "Pending";
-    return `<tr><td>${session.id}</td><td>${new Date(session.started_at).toLocaleString()}</td><td>${session.ended_at ? new Date(session.ended_at).toLocaleString() : "In progress"}</td><td>${session.packet_count}</td><td>${protocols} (${session.analysis.total_bytes} B)</td></tr>`;
+    return `<tr>
+      <td><strong>${session.id}</strong></td>
+      <td>${new Date(session.started_at).toLocaleString()}</td>
+      <td>${session.ended_at ? new Date(session.ended_at).toLocaleString() : "In progress"}</td>
+      <td>${session.packet_count}</td>
+      <td>${protocols} (${session.analysis.total_bytes || 0} B)</td>
+      <td style="white-space: nowrap;">
+        <a href="/api/sessions/${session.id}/export?format=pcap" class="export-link" download title="Download PCAP">PCAP</a> |
+        <a href="/api/sessions/${session.id}/report" class="export-link" target="_blank" title="View Report">Report</a> |
+        <a href="/api/sessions/${session.id}/export?format=json" class="export-link" download title="Download JSON">JSON</a>
+      </td>
+    </tr>`;
   }).join("");
 }
 
@@ -398,6 +409,89 @@ async function refreshPerformance() {
   }
 }
 
+
+// --- Zeek Network Analysis (Issue #9, FR-5, FR-10) ---
+
+let currentZeekLogType = "all";
+
+async function refreshZeek() {
+  const logList = el("zeek-log-list");
+  if (!logList) return;
+
+  try {
+    const statsRes = await fetch("/api/zeek/stats");
+    if (statsRes.ok) {
+      const statsData = await statsRes.json();
+      const zSum = statsData.zeek_summary || {};
+      if (el("zeek-stat-conn")) el("zeek-stat-conn").textContent = zSum.total_connections || 0;
+      if (el("zeek-stat-dns")) el("zeek-stat-dns").textContent = zSum.dns_transactions || 0;
+      if (el("zeek-stat-weird")) el("zeek-stat-weird").textContent = zSum.weird_events || 0;
+      if (el("zeek-stat-notice")) el("zeek-stat-notice").textContent = zSum.security_notices || 0;
+    }
+
+    const url = currentZeekLogType && currentZeekLogType !== "all"
+      ? `/api/zeek/logs?type=${encodeURIComponent(currentZeekLogType)}`
+      : "/api/zeek/logs";
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    const logs = data.logs || [];
+
+    if (logs.length === 0) {
+      logList.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 1rem;">No Zeek log entries matching selected filter.</td></tr>';
+      return;
+    }
+
+    logList.innerHTML = logs
+      .map((entry) => {
+        const type = (entry.log_type || currentZeekLogType || "conn").toUpperCase();
+        let badgeClass = "badge-info";
+        if (type === "WEIRD") badgeClass = "badge-warning";
+        else if (type === "NOTICE") badgeClass = "badge-critical";
+
+        const timeStr = entry.ts ? new Date(entry.ts).toLocaleTimeString() : "--:--:--";
+        const uidStr = entry.uid || entry.trans_id || "-";
+
+        let endpointStr = "-";
+        let detailStr = "-";
+
+        if (entry.log_type === "conn" || (!entry.log_type && entry["id.orig_h"])) {
+          endpointStr = `${entry["id.orig_h"]}:${entry["id.orig_p"]} &rarr; ${entry["id.resp_h"]}:${entry["id.resp_p"]} (${entry.service || "-"})`;
+          detailStr = `State: ${entry.conn_state || "-"} | Orig: ${entry.orig_bytes || 0}B, Resp: ${entry.resp_bytes || 0}B`;
+        } else if (entry.log_type === "dns" || entry.query) {
+          endpointStr = `${entry["id.orig_h"]} &rarr; ${entry["id.resp_h"]}`;
+          detailStr = `Query: ${entry.query} (${entry.qtype_name || "A"}) | RCode: ${entry.rcode_name || "NOERROR"}`;
+        } else if (entry.log_type === "weird" || entry.name) {
+          endpointStr = `Peer: ${entry.peer || "-"}`;
+          detailStr = `Weird: <strong>${entry.name}</strong> (${entry.addl || ""})`;
+        } else if (entry.log_type === "notice" || entry.note) {
+          endpointStr = `${entry.src || "-"} &rarr; ${entry.dst || "-"}`;
+          detailStr = `<strong>${entry.note}</strong>: ${entry.msg || ""}`;
+        }
+
+        return `<tr>
+          <td><span class="${badgeClass}">${type}</span></td>
+          <td>${timeStr}</td>
+          <td><code>${uidStr}</code></td>
+          <td>${endpointStr}</td>
+          <td style="white-space: normal; max-width: 320px;">${detailStr}</td>
+        </tr>`;
+      })
+      .join("");
+  } catch (err) {
+    // Non-blocking
+  }
+}
+
+document.querySelectorAll(".zeek-chip").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".zeek-chip").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentZeekLogType = btn.getAttribute("data-logtype") || "all";
+    refreshZeek();
+  });
+});
+
 // Initial boot
 checkAuth();
 loadInterfaces();
@@ -407,6 +501,7 @@ refreshSessions();
 refreshStats();
 refreshAlerts();
 refreshPerformance();
+refreshZeek();
 
 setInterval(() => {
   refresh();
@@ -414,4 +509,5 @@ setInterval(() => {
   refreshSessions();
   refreshAlerts();
   refreshPerformance();
+  refreshZeek();
 }, POLL_INTERVAL_MS);
