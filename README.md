@@ -1,9 +1,9 @@
 # Pocket Packet Sniffer (PPS)
 
 [![Pocket Packet Sniffer CI](https://github.com/SE-Mini-P/Pocket-Packet-Sniffer/actions/workflows/ci.yml/badge.svg)](https://github.com/SE-Mini-P/Pocket-Packet-Sniffer/actions)
-![Tests](https://img.shields.io/badge/Tests-57%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-92%20passed-brightgreen)
 ![Coverage](https://img.shields.io/badge/Coverage-92%25-brightgreen)
-![Status](https://img.shields.io/badge/Sprint%202-Frozen%20%28v1.0--RC1%29-blue)
+![Status](https://img.shields.io/badge/Sprint%202-Completed%20%28v1.0--RC1%29-blue)
 
 Portable WiFi / Ethernet / BLE packet sniffer with real-time protocol analysis and a self-hosted web dashboard.
 Designed for network field diagnostics, wireless site surveys, and lightweight edge anomaly detection.
@@ -33,11 +33,13 @@ Pocket-Packet-Sniffer/
 │   ├── __init__.py
 │   ├── parser.py             # Packet dissector (Ethernet, WiFi 802.11, BLE, IP, TCP, UDP, DNS, HTTP, ARP)
 │   ├── metadata.py           # PacketMetadata data model & MetadataExtractor aggregation
+│   ├── zeek_engine.py        # Embedded Zeek analysis engine (conn.log, dns.log, weird.log, notice.log)
 │   └── error_handling.py     # Resilient error handling for truncated/corrupt frames (SADS 3.4)
-├── storage/                  # Storage Subsystem - SADS 2.2.1, 3.3, SEC-REQ-1, SEC-REQ-5, FR-8
+├── storage/                  # Storage Subsystem - SADS 2.2.1, 3.3, SEC-REQ-1, SEC-REQ-5, FR-8, FR-9, FR-10
 │   ├── __init__.py
 │   ├── database.py           # SQLite database manager with hash-chained audit logging
-│   └── pcap_store.py         # Standards-compliant libpcap (.pcap) export writer
+│   ├── pcap_store.py         # Standards-compliant libpcap (.pcap) export writer
+│   └── exporter.py           # Multi-format exporter for JSON, CSV, PCAP, and HTML session reports
 ├── backend/                  # Backend Services Layer - SADS 2.2.1, SADS 3.2
 │   ├── __init__.py
 │   ├── app.py                # Flask application exposing REST APIs and static dashboard
@@ -48,16 +50,19 @@ Pocket-Packet-Sniffer/
 │   ├── index.html            # Responsive single-page dashboard
 │   ├── css/styles.css        # Responsive styling (NFR-PORT-1 >= 360px viewport)
 │   └── js/app.js             # Live polling, stats refresh, filter application, auth handling
-├── tests/                    # Automated Test Suite - SADS 3.5, NFR-MAINT-1 (46/46 passing)
+├── tests/                    # Automated Test Suite - SADS 3.5, NFR-MAINT-1 (92/92 passing)
 │   ├── __init__.py
 │   ├── test_app.py           # REST API, auth lockout, RBAC, and input validation tests
 │   ├── test_processing.py    # Protocol dissection, metadata extraction, and malformed frame tests
 │   ├── test_capture.py       # Ring buffer overflow bounds, interface detection tests
-│   └── test_storage.py       # SQLite persistence, pcap exporter, and audit log integrity tests
+│   ├── test_storage.py       # SQLite persistence, pcap exporter, and audit log integrity tests
+│   ├── test_performance.py   # Latency benchmarks, memory boundedness, resource telemetry tests
+│   ├── test_zeek.py          # Zeek analysis engine, structured log generation, anomaly tests (Issue #9)
+│   └── test_export.py        # Multi-format data export & HTML session summary tests (Issue #13)
 ├── docs/                     # Specifications, test evidence, demo videos & freeze reports
 │   ├── demos/                # Sprint demonstration videos
 │   ├── SPRINT2_FREEZE.md     # Release baseline and development freeze declaration
-│   └── TEST_RESULTS.md       # Comprehensive 46-test execution and 91% coverage report
+│   └── TEST_RESULTS.md       # Comprehensive 92-test execution and 92% coverage report
 ├── .github/workflows/        # CI/CD Workflows
 │   └── ci.yml                # Automated GitHub Actions test & coverage gate (>= 70%)
 ├── requirements.txt          # Root Python dependency manifest
@@ -141,16 +146,27 @@ All protected endpoints require session authentication (`Authorization: Bearer <
 | `GET` | `/api/capture/stats` | Real-time traffic statistics and protocol distribution | Field Engineer+ |
 | `GET` | `/api/packets` | Query captured packets (supports `protocol`, `source`, `destination`, `search`) | Field Engineer+ |
 | `POST` | `/api/packets/process` | Dissect raw packet payload or packet dict & extract metadata | Field Engineer+ |
+| `GET` | `/api/alerts` | Query active and historical security alerts (severity filter) | Field Engineer+ |
+| `POST` | `/api/alerts` | Ingest observation or security alert | Field Engineer+ |
+| `GET` | `/api/system/performance` | Query response time latency, CPU, RSS memory, buffer telemetry | Field Engineer+ |
+| `GET` | `/api/zeek/logs` | Retrieve Zeek structured logs (`conn`, `dns`, `weird`, `notice`, `all`) | Field Engineer+ |
+| `GET` | `/api/zeek/stats` | Retrieve Zeek analysis and anomaly summary statistics | Field Engineer+ |
+| `POST` | `/api/zeek/analyze` | Trigger on-demand Zeek analysis on packets or active session | Field Engineer+ |
+| `GET` | `/api/export` | Export selected metadata/analysis in `json`, `csv`, `pcap`, or `html` | Field Engineer+ |
+| `GET` | `/api/sessions` | List capture history with packet counts and analysis summaries | Field Engineer+ |
+| `GET` | `/api/sessions/<id>` | Retrieve session detail by session ID | Field Engineer+ |
+| `GET` | `/api/sessions/<id>/export` | Download session as `.pcap`, JSON, or CSV | Field Engineer+ |
+| `GET` | `/api/sessions/<id>/report` | Generate and download human-readable HTML summary report | Field Engineer+ |
 | `GET` | `/api/admin/system` | Access administrator system controls (RBAC protected) | Administrator |
 
 ---
 
 ## 5. Running Automated Tests & Code Coverage
 
-Run the full automated test suite covering unit, integration, performance, and security test cases:
+Run the full automated test suite covering unit, integration, performance, Zeek analysis, and security test cases:
 
 ```bash
-# Run all 57 tests
+# Run all 92 tests
 python -m unittest discover -s tests -v
 
 # Run with Coverage verification (enforces >= 70% threshold)
@@ -159,8 +175,8 @@ python -m coverage report --fail-under=70
 ```
 
 ### Coverage Summary (92% Achieved)
-- **Statements:** 1,495
-- **Passing Tests:** 57 / 57
+- **Statements:** 2,279
+- **Passing Tests:** 92 / 92
 - **Pass Rate:** 100%
 - See detailed reports in [`docs/TEST_RESULTS.md`](docs/TEST_RESULTS.md) and [`docs/PERFORMANCE_REPORT.md`](docs/PERFORMANCE_REPORT.md).
 
@@ -181,16 +197,12 @@ python -m coverage report --fail-under=70
 | **#10** | Filter and search captured traffic | 5 SP | `@oneshot-death` | FR-06, SADS 3.2 | **Closed (PR #17)** |
 | **#14** | Add authentication and access controls | 5 SP | `@YASH0212-shift` | SEC-REQ-2, SEC-REQ-3, SEC-REQ-6 | **Closed (PR #19)** |
 
-### Sprint 2: Automated Checks, Alerts & Performance Verification
+### Sprint 2: Automated Checks, Alerts, Zeek Analysis & Multi-Format Export (33 Story Points — 100% Complete)
 | Issue ID | Title | Story Points | Assignee | Requirements Addressed | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| **#9** | Integrate Zeek analysis | 8 SP | `@shreyasgowda1956` | FR-07, FR-5, FR-10, SADS 2.1, 2.2, 3.1 | **Closed (PR #27)** |
 | **#11** | Display alerts and analysis observations | 5 SP | `@krrish676767` | FR-08, SADS 3.3 | **Closed (PR #26)** |
+| **#12** | Save and view capture history | 5 SP | `@oneshot-death` | FR-09, SADS 3.3 | **Closed (PR #25)** |
+| **#13** | Export selected analysis information | 5 SP | `@shreyasgowda1956` | FR-10, FR-8, FR-9, SADS 3.2 | **Closed (PR #27)** |
 | **#15** | Test performance and resource usage | 5 SP | `@krrish676767` | NFR-01, NFR-02, NFR-07, SADS 3.5 | **Closed (PR #26)** |
 | **#16** | Complete automated checks and documentation | 5 SP | `@YASH0212-shift` | NFR-MAINT-1, NFR-06 | **Closed (PR #24)** |
-
-### Capture session history (Issue #12)
-
-`GET /api/sessions` returns capture history. Each session includes its interface,
-start/end timestamps, packet count, and analysis results (packet counts by
-protocol and total bytes). `GET /api/sessions/<session-id>` returns one session;
-unknown session IDs return HTTP 404.

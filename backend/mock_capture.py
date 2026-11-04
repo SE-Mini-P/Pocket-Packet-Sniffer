@@ -22,6 +22,7 @@ except ImportError:
 
 try:
     from processing.metadata import PacketMetadata, MetadataExtractor
+    from processing.zeek_engine import ZeekAnalysisEngine
     from capture.interfaces import STANDARD_INTERFACES
     from capture.buffer import CaptureBuffer
 except ImportError:
@@ -32,6 +33,7 @@ except ImportError:
     if root not in sys.path:
         sys.path.insert(0, root)
     from processing.metadata import PacketMetadata, MetadataExtractor
+    from processing.zeek_engine import ZeekAnalysisEngine
     from capture.interfaces import STANDARD_INTERFACES
     from capture.buffer import CaptureBuffer
 
@@ -182,6 +184,9 @@ class MockCaptureService:
         self._next_session_id = 1
         self._alerts: List[Dict[str, Any]] = [deepcopy(a) for a in RAW_MOCK_ALERTS]
         self._latency_samples: List[float] = [12.4, 18.2, 14.8, 22.1, 15.6]
+        self.zeek_engine = ZeekAnalysisEngine()
+        for p in self._packets:
+            self.zeek_engine.process_packet(p)
 
     def get_interfaces(self) -> dict[str, dict]:
         """Detect and return supported network interfaces (FR-02, NFR-02, SADS 3.2)."""
@@ -233,7 +238,10 @@ class MockCaptureService:
             "ended_at": datetime.now(timezone.utc).isoformat(),
             "status": "completed",
             "packet_count": len(self._packets),
-            "analysis": self._analyse_packets(self._packets),
+            "analysis": {
+                **self._analyse_packets(self._packets),
+                "zeek": self.zeek_engine.get_summary(),
+            },
         })
         self._active_session_id = None
         return self.get_status()
@@ -271,6 +279,14 @@ class MockCaptureService:
         normalized = MetadataExtractor.normalize(packet)
         self._packets.append(normalized)
         self.ring_buffer.push(normalized.to_dict())
+        events = self.zeek_engine.process_packet(normalized)
+        for notice in events.get("notices", []):
+            self.add_alert({
+                "alert_type": notice.get("note", "ZEEK_NOTICE"),
+                "severity": notice.get("severity", "WARNING"),
+                "source_ip": notice.get("src", "0.0.0.0"),
+                "details": notice.get("msg", ""),
+            })
 
     def get_packets(self, filters: dict | None = None) -> list[dict]:
         """Return packets matching filters with extracted metadata."""
@@ -464,3 +480,11 @@ class MockCaptureService:
             },
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
+
+    def get_zeek_logs(self, log_type: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """Return structured Zeek logs (conn.log, dns.log, weird.log, notice.log) (FR-5)."""
+        return self.zeek_engine.get_logs(log_type=log_type, limit=limit)
+
+    def get_zeek_summary(self) -> Dict[str, Any]:
+        """Return Zeek analysis summary (FR-5)."""
+        return self.zeek_engine.get_summary()
