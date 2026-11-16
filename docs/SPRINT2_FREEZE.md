@@ -1,7 +1,7 @@
 # Sprint 2 Development Freeze & Release Specification
 **Project:** Pocket Packet Sniffer (PPS)  
 **Release Version:** `v1.0-RC1` (Release Candidate 1)  
-**Date of Freeze:** 29 October 2026  
+**Date of Freeze:** 29 October 2026 (initial declaration); **re-baselined 4 November 2026**, see §6  
 **Document Traceability:** `PPS-SRS-1.0`, `PPS-SADS-1.0`, `PPS-TP-1.0`  
 **Milestone:** Deliverables Part-2 Item 3c & 3d (Documentation Complete & Development Freeze)  
 
@@ -12,8 +12,8 @@
 As of **29th October 2026**, the development cycle for the **Pocket Packet Sniffer (PPS)** is officially **FROZEN**. No new feature code or schema alterations may be merged to the `main` branch without formal Engineering Change Request approval.
 
 All codebase artifacts have passed quality gates:
-- **Unit & Integration Tests:** 92/92 passing (100% pass rate).
-- **Test Statement Coverage:** 92% (exceeds the 70% threshold in NFR-MAINT-1).
+- **Unit & Integration Tests:** 92/92 passing at the 4 November 2026 baseline (46 tests at the original 29 October declaration; see §6).
+- **Test Coverage:** 92% statement, 72% branch, 88.5% combined (exceeds the 70% threshold in NFR-MAINT-1; see `BRANCH_COVERAGE_REPORT.md`).
 - **Linting & Quality:** Flake8 clean; zero syntax or unresolved name errors.
 - **CI/CD Automation:** GitHub Actions workflow executing on every push and pull request.
 
@@ -78,3 +78,31 @@ Per **Deliverables Part-2 Item 3b** (*"Record a two minute video of the outcome 
    - Physical ESP32 firmware flashing and hardware UART tap remain mocked via `backend/mock_capture.py` and `capture/service.py` to allow end-to-end edge dashboard testing across standard Linux/Windows development environments without physical RF interference.
 2. **Offline-First SQLite Storage:**
    - Database operations use local SQLite with SHA-256 hash chaining to satisfy the offline-first field deployment constraint (FR-14) without requiring an external database server.
+
+3. **Additional Sprint 2 Test Cases Beyond the Baseline Test Plan:**
+   - The baseline Test Plan (PPS-TP-1.0) defines `TC-FUNC-01..07`, `TC-PERF-08`, `TC-REL-09` and `TC-SEC-01..03`. Sprint 2 added automated cases for input validation, error handling, alerts, the audit log, telemetry, Zeek analysis and export. They are marked "Added (S2)" in `UNIT_TEST_REPORT.md` and `SYSTEM_VALIDATION_REPORT.md`.
+   - Earlier drafts of `TEST_RESULTS.md` used IDs `TC-ERR-01`, `TC-SEC-04`, `TC-SEC-05` and `TC-PERF-01`, which do not exist in the Test Plan PDF; they were removed in the 16 November 2026 correction.
+4. **Hardware-dependent Test Plan Cases Not Executed as Written:**
+   - `TC-SEC-01` (encryption at rest) and `TC-FUNC-07` (alert acknowledgment) have no automated test, and the hardware load cases (`TC-PERF-08` at 5,000 pkt/s, `TC-REL-09` for 30 minutes) are covered only by their software-level equivalents. See `SYSTEM_VALIDATION_REPORT.md` §2.
+5. **Zeek Integration Approach:**
+   - Zeek analysis is implemented as an embedded Python engine (`processing/zeek_engine.py`) that produces Zeek-style `conn.log`, `dns.log`, `weird.log` and `notice.log` records. It is not the Zeek binary.
+6. **Pull Request Review Process:**
+   - Sprint 1 and 2 PRs were merged without formal GitHub review approvals, and most were merged by their own author. Repository-owner review is required from the post-freeze addendum onward (`CONTRIBUTING.md`).
+
+---
+
+## 6. Post-Freeze Amendment and Re-Baseline (added 16 November 2026)
+
+The freeze was declared on 29 October 2026, but the following changes were merged to `main` afterwards. They were not covered by an Engineering Change Request at the time, and are recorded here retrospectively:
+
+| Merged (UTC) | PR | Change | Scope |
+| :--- | :--- | :--- | :--- |
+| 30 Oct 2026 | #25 | Capture session history | Feature (Issue #12) |
+| 30 Oct 2026 | #26 | Alerts display, analysis observations, performance and resource testing | Feature and NFR tests (Issues #11, #15) |
+| 4 Nov 2026 | #27 | Zeek analysis integration and multi-format export | Feature (Issues #9, #13) |
+| 4 Nov 2026 | #28 | Sprint 2 outcome demo video | Docs |
+
+- **Test count:** 46 tests at 29 October, 57 at 30 October (the count quoted in `PERFORMANCE_REPORT.md`), 92 from 4 November (after PR #27).
+- **Effective freeze baseline:** `main` at commit `5256a1e` (4 November 2026, after PR #28). No feature code has been merged since.
+- **This addendum** is documentation and CI configuration only (branch coverage reporting, unit and system validation reports, report corrections, `CONTRIBUTING.md`). No production code changed.
+- The Sprint 2 demo video (`docs/demos/sprint2_demo.mp4`) was recorded on 4 November 2026, so it reflects the re-baselined product.

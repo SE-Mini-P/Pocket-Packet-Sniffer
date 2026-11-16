@@ -19,3 +19,8 @@ venv
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Coverage output
+.coverage
+coverage-report/
+htmlcov/

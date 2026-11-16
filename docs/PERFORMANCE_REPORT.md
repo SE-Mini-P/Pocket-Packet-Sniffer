@@ -16,8 +16,8 @@ This document reports the performance characterization and resource consumption 
 ======================================================================
 Performance & Resource Benchmark Summary:
 - Test Execution Date:          30 October 2026
-- Automated Test Suite:         57/57 Tests Passing (100% Pass Rate)
-- Statement Test Coverage:      92% (Exceeds >= 70% Quality Gate)
+- Automated Test Suite:         57/57 Tests Passing at measurement time (30 Oct); suite is 92/92 as of 4 Nov
+- Statement Test Coverage:      92% (Exceeds >= 70% Quality Gate; branch coverage in BRANCH_COVERAGE_REPORT.md)
 - Dashboard Mean Response Time: 3.12 ms (Target: <= 500.0 ms) [PASS]
 - 95th Percentile Latency:      6.84 ms (Target: <= 500.0 ms) [PASS]
 - Peak Memory RSS:              46.8 MB (Ceiling: < 512.0 MB) [BOUNDED]
@@ -76,7 +76,7 @@ To guarantee edge stability and prevent kernel Out-Of-Memory (OOM) faults on emb
 - **Drop Rate Telemetry:** `drop_rate_percent = 80.0%` accurately logged.
 
 ### 4.2 Resident Set Size (RSS) Progression
-Memory usage was monitored throughout the execution of the entire 57-test suite:
+Memory usage was monitored throughout the execution of the 57-test suite that existed on 30 October 2026 (the suite has since grown to 92 tests; the three performance tests in `tests/test_performance.py` are unchanged):
 - **Baseline Memory RSS (Startup):** 38.2 MB
 - **Active Capture & Processing:** 44.5 MB
 - **Peak RSS (Post-Stress Test):** 46.8 MB
@@ -113,4 +113,4 @@ Storage growth was evaluated across the SQLite relational store (`storage/databa
 
 ## 7. Quality Gate Sign-Off
 
-The performance and resource verification suite satisfies all required quality gates. Code changes have been tested with 100% pass rate (57/57 tests passing) and 92% statement coverage, qualifying the PPS codebase for complete Sprint 2 milestone delivery.
+The performance and resource verification suite satisfies all required quality gates. The code was tested with a 100% pass rate (57/57 tests at measurement time on 30 October 2026; 92/92 after the later Zeek and export features) and 92% statement coverage, qualifying the PPS codebase for complete Sprint 2 milestone delivery.
