@@ -2,7 +2,7 @@
 
 [![Pocket Packet Sniffer CI](https://github.com/SE-Mini-P/Pocket-Packet-Sniffer/actions/workflows/ci.yml/badge.svg)](https://github.com/SE-Mini-P/Pocket-Packet-Sniffer/actions)
 ![Tests](https://img.shields.io/badge/Tests-92%20passed-brightgreen)
-![Coverage](https://img.shields.io/badge/Coverage-92%25-brightgreen)
+![Coverage](https://img.shields.io/badge/Coverage-92%25%20stmt%20%7C%2072%25%20branch-brightgreen)
 ![Status](https://img.shields.io/badge/Sprint%202-Completed%20%28v1.0--RC1%29-blue)
 
 Portable WiFi / Ethernet / BLE packet sniffer with real-time protocol analysis and a self-hosted web dashboard.
@@ -13,6 +13,9 @@ Refer to the companion specifications in `docs/`:
 - **Software Architecture & Design Specification** (`docs/SADS_Pocket_Packet_Sniffer.pdf` / PPS-SADS-1.0)
 - **Software Test Plan** (`docs/TestPlan_Pocket_Packet_Sniffer.pdf` / PPS-TP-1.0)
 - **Automated Test Results & Verification** ([`docs/TEST_RESULTS.md`](docs/TEST_RESULTS.md))
+- **Unit Test Report** ([`docs/UNIT_TEST_REPORT.md`](docs/UNIT_TEST_REPORT.md))
+- **System Validation Report** ([`docs/SYSTEM_VALIDATION_REPORT.md`](docs/SYSTEM_VALIDATION_REPORT.md))
+- **Branch Coverage Report** ([`docs/BRANCH_COVERAGE_REPORT.md`](docs/BRANCH_COVERAGE_REPORT.md))
 - **Performance & Resource Usage Report** ([`docs/PERFORMANCE_REPORT.md`](docs/PERFORMANCE_REPORT.md))
 - **Sprint 2 Development Freeze Specification** ([`docs/SPRINT2_FREEZE.md`](docs/SPRINT2_FREEZE.md))
 
@@ -62,7 +65,10 @@ Pocket-Packet-Sniffer/
 ├── docs/                     # Specifications, test evidence, demo videos & freeze reports
 │   ├── demos/                # Sprint demonstration videos
 │   ├── SPRINT2_FREEZE.md     # Release baseline and development freeze declaration
-│   └── TEST_RESULTS.md       # Comprehensive 92-test execution and 92% coverage report
+│   ├── TEST_RESULTS.md       # Test summary, statement coverage and report index
+│   ├── UNIT_TEST_REPORT.md   # 38 unit tests with traceability
+│   ├── SYSTEM_VALIDATION_REPORT.md  # 54 system/API tests with traceability
+│   └── BRANCH_COVERAGE_REPORT.md    # Branch coverage per module and gap analysis
 ├── .github/workflows/        # CI/CD Workflows
 │   └── ci.yml                # Automated GitHub Actions test & coverage gate (>= 70%)
 ├── requirements.txt          # Root Python dependency manifest
@@ -169,16 +175,17 @@ Run the full automated test suite covering unit, integration, performance, Zeek 
 # Run all 92 tests
 python -m unittest discover -s tests -v
 
-# Run with Coverage verification (enforces >= 70% threshold)
-python -m coverage run -m unittest discover -s tests
-python -m coverage report --fail-under=70
+# Run with statement + branch coverage verification (enforces >= 70% threshold)
+python -m coverage run --branch -m unittest discover -s tests
+python -m coverage report --show-missing --fail-under=70
 ```
 
-### Coverage Summary (92% Achieved)
-- **Statements:** 2,279
+### Coverage Summary (92% Statement, 72% Branch, 88.5% Combined)
+- **Statements:** 2,270
+- **Branches:** 466
 - **Passing Tests:** 92 / 92
 - **Pass Rate:** 100%
-- See detailed reports in [`docs/TEST_RESULTS.md`](docs/TEST_RESULTS.md) and [`docs/PERFORMANCE_REPORT.md`](docs/PERFORMANCE_REPORT.md).
+- See detailed reports in [`docs/TEST_RESULTS.md`](docs/TEST_RESULTS.md), [`docs/UNIT_TEST_REPORT.md`](docs/UNIT_TEST_REPORT.md), [`docs/SYSTEM_VALIDATION_REPORT.md`](docs/SYSTEM_VALIDATION_REPORT.md), [`docs/BRANCH_COVERAGE_REPORT.md`](docs/BRANCH_COVERAGE_REPORT.md) and [`docs/PERFORMANCE_REPORT.md`](docs/PERFORMANCE_REPORT.md).
 
 ---
 
